@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Campus IDS - Alert Dashboard Prototype</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 24px; max-width: 600px; margin: auto; }
+        button { padding: 10px 16px; font-size: 14px; cursor: pointer; }
+        #alert-list { list-style: none; padding: 0; }
+        #alert-list li {
+            background: #fdecea; border-left: 4px solid #e53935;
+            padding: 10px; margin-top: 8px; border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Campus IDS Dashboard (Prototype)</h1>
+    <p>This page updates instantly when an alert is pushed — no refresh needed.</p>
+    <button onclick="fireTestAlert()">Send Test Alert</button>
+
+    <h2>Alerts</h2>
+    <ul id="alert-list"></ul>
+
+    <script>
+        const socket = io();
+        const list = document.getElementById("alert-list");
+
+        socket.on("new_alert", (data) => {
+            const item = document.createElement("li");
+            item.textContent = `[${data.time}] ${data.message} (from ${data.src_ip})`;
+            list.prepend(item);
+        });
+
+        function fireTestAlert() {
+            fetch("/trigger-test-alert");
+        }
+    </script>
+</body>
+</html>
