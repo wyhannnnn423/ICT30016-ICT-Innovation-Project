@@ -17,7 +17,7 @@ Run with admin/root privileges (needed for raw packet capture):
 This is a STARTING POINT, not the final capture engine — it prints
 flow stats to the console instead of feeding them into the model.
 Once this works, the next step is to replace the print() with a
-call to your feature_extraction.py / model pipeline.
+call to feature_extraction.py / model pipeline.
 """
 
 import time
