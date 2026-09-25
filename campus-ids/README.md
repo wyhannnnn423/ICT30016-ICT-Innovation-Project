@@ -30,33 +30,38 @@ campus-ids/
 1. **Extract Flow Features** (Requires Suricata configured with `eve-log` flow output enabled)
    ```bash
    python suricata/read_suricata_flows.py --input /var/log/suricata/eve.json --output data/suricata_flow_features.csv
-Train Model
+      ```
+2. **Train Model**
 
-Bash
+ ```Bash
 python model/train_model.py --input data/suricata_flow_features.csv --model_out model/ids_model.joblib
-Detect Anomalies
+ ```
+ 
+ 3. **Detect Anomalies**
 
-Bash
+ ```Bash
 python model/predict.py --input data/suricata_flow_features.csv \
                         --model model/ids_model.joblib \
                         --scaler model/ids_scaler.joblib \
                         --output data/flagged_anomalies.csv
-Launch Dashboard
+ ```                        
+ 4. **Launch Dashboard**
 
-Bash
+ ```Bash
 cd dashboard
 python app.py
 Open http://127.0.0.1:5000 in your browser.
-
+ ```
 Installation
-Bash
+ ```Bash
 pip install -r requirements.txt
-Git Workflow
+ ```
+##Git Workflow
 The main branch is reserved for stable releases.
 
-Feature branches (e.g., feature/suricata-parser) should be used for ongoing development.
+##Feature branches (e.g., feature/suricata-parser) should be used for ongoing development.
 
-Merges must pass a Pull Request code review before integration.
+##Merges must pass a Pull Request code review before integration.
 
-Notes
+##Notes
 This repository serves as the official production codebase. Prototype and demo implementations are maintained separately in the ids_demo repository.
