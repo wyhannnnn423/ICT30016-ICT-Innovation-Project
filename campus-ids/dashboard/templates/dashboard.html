@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Campus IDS Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0f1115; color: #e6e6e6; margin: 40px; }
+        h1 { color: #4fc3f7; }
+        .summary { display: flex; gap: 30px; margin-bottom: 30px; }
+        .card { background: #1a1d24; padding: 20px 30px; border-radius: 10px; }
+        .card .number { font-size: 28px; font-weight: bold; }
+        .card.alert .number { color: #ff5252; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; border-bottom: 1px solid #333; text-align: left; font-size: 14px; }
+        th { color: #4fc3f7; }
+        tr:hover { background: #1a1d24; }
+    </style>
+</head>
+<body>
+    <h1>Campus IDS Real-Time Monitoring Dashboard</h1>
+
+    <div class="summary">
+        <div class="card">
+            <div>Total Flows</div>
+            <div class="number">{{ total_flows }}</div>
+        </div>
+        <div class="card alert">
+            <div>Suspected Anomalies</div>
+            <div class="number">{{ total_anomalies }}</div>
+        </div>
+    </div>
+
+    <h2>Anomaly Alert Feed</h2>
+    {% if anomalies|length == 0 %}
+        <p>No anomaly alerts detected, or detection has not been executed yet.</p>
+    {% else %}
+    <table>
+        <tr>
+            <th>Timestamp</th>
+            <th>Source IP</th>
+            <th>Destination IP</th>
+            <th>Protocol</th>
+            <th>Total Bytes</th>
+            <th>Anomaly Score</th>
+        </tr>
+        {% for row in anomalies %}
+        <tr>
+            <td>{{ row.timestamp }}</td>
+            <td>{{ row.src_ip }}</td>
+            <td>{{ row.dest_ip }}</td>
+            <td>{{ row.proto }}</td>
+            <td>{{ row.total_bytes }}</td>
+            <td>{{ "%.4f"|format(row.anomaly_score) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+</body>
+</html>
