@@ -29,8 +29,8 @@ campus-ids/
 
 1. **Extract Flow Features** (Requires Suricata configured with `eve-log` flow output enabled)
    ```bash
-   python suricata/read_suricata_flows.py --input /var/log/suricata/eve.json --output data/suricata_flow_features.csv
-      ```
+   python suricata/read_suricata_flows.py --input "C:\Program Files\Suricata\log\eve.json" --output data/suricata_flow_features.csv
+   ```
 2. **Train Model**
 
  ```Bash
