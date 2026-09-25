@@ -8,8 +8,8 @@ This system captures real-time network traffic via **Suricata**, extracts IPv4 f
 
 ## Team Members
 
-- **Jane Yan Zhen YU** — Team Lead
-- **Yan Han WONG (Han)**
+- **Jane Yan Zhen YU** — Team Leader
+- **Yan Han WONG**
 - **Neville**
 - **Bruce Gee Yick WONG**
 
