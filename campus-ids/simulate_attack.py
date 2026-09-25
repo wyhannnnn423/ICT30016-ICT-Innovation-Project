@@ -9,7 +9,7 @@ import socket
 import time
 
 # IMPORTANT: Change this to your real LAN IP address (do not use 127.0.0.1)
-TARGET_HOST = "192.168.50.190"          
+TARGET_HOST = "192.168.50.1"
 TARGET_PORTS = range(7000, 7050)   
 
 print("[*] Initiating simulated anomalous traffic: Rapid Port Scanning...")
