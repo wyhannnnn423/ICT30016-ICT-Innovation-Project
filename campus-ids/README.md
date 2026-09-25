@@ -12,7 +12,7 @@ A lightweight, AI-driven Intrusion Detection System designed for campus networks
 - Bruce Gee Yick WONG
 
 ## Project Structure
-
+```
 campus-ids/
 ├── suricata/           # Parses Suricata logs and extracts flow features
 │   └── read_suricata_flows.py
@@ -24,7 +24,7 @@ campus-ids/
 ├── app.py
 └── templates/
 └── dashboard.html
-
+```
 ## Workflow
 
 1. **Extract Flow Features** (Requires Suricata configured with `eve-log` flow output enabled)
