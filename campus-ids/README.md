@@ -61,6 +61,8 @@ To fulfill the Testing and Evaluation requirements (Deliverable D5), the system 
 To run the evaluation and generate the detection rate matrix:
 ```powershell
 python evaluation/evaluate_cicids.py --input evaluation/Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv evaluation/Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv --model model/ids_model.joblib --scaler model/ids_scaler.joblib --out evaluation/cicids_evaluation.csv
+```
+
 ## 🛑 Safe Shutdown Procedure
 To gracefully shut down the system and prevent file corruption:
 1. **Dashboard:** Go to the terminal running `app.py` and press `Ctrl + C`.
