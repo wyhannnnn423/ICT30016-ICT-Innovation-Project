@@ -35,8 +35,8 @@ def train(df: pd.DataFrame, contamination: float = 0.05):
     X_scaled = scaler.fit_transform(X)
     
     model = IsolationForest(
-        n_estimators=200,
-        contamination=contamination,
+        n_estimators=100,
+        contamination=0.01,
         random_state=42,
     )
     model.fit(X_scaled)

@@ -1,30 +1,109 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Campus IDS - Real-Time Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
-        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 0; }
-        .status-badge { display: inline-block; padding: 6px 12px; border-radius: 4px; background-color: #f39c12; color: white; font-size: 0.9em; font-weight: bold; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ecf0f1; }
-        th { background-color: #34495e; color: white; font-weight: 600; }
-        .threat-row { background-color: #fff3cd; color: #856404; animation: slideDown 0.4s ease-out; }
-        .threat-row td { border-bottom: 1px solid #ffeeba; }
-        .score-high { color: #c0392b; font-weight: bold; }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-15px); background-color: #ffc107;} to { opacity: 1; transform: translateY(0); background-color: #fff3cd;} }
-        .empty-msg { text-align: center; padding: 30px; color: #7f8c8d; font-style: italic; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            background-color: #f39c12;
+            color: white;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        th,
+        td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        th {
+            background-color: #34495e;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .threat-row {
+            background-color: #fff3cd;
+            color: #856404;
+            animation: slideDown 0.4s ease-out;
+        }
+        
+        .threat-row td {
+            border-bottom: 1px solid #ffeeba;
+        }
+        
+        .score-high {
+            color: #c0392b;
+            font-weight: bold;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-15px);
+                background-color: #ffc107;
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+                background-color: #fff3cd;
+            }
+        }
+        
+        .empty-msg {
+            text-align: center;
+            padding: 30px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>🛡️ Campus IDS Real-Time Alerts</h1>
         <div class="status-badge" id="connection-status">Connecting to Detection Engine...</div>
-        
+        <button onclick="exportTableToCSV('campus_ids_alerts.csv')" style="float: right; margin-bottom: 10px; padding: 5px 15px; background-color: #0d6efd; color: white; border: none; border-radius: 4px; cursor: pointer;">
+    ⬇️ Export to CSV
+</button>
         <table>
             <thead>
                 <tr>
@@ -61,15 +140,15 @@
         socket.on('new_alert', function(data) {
             const tableBody = document.getElementById('alert-table-body');
             const emptyRow = document.getElementById('empty-row');
-            
+
             if (emptyRow) {
                 emptyRow.remove();
             }
-            
+
             const newRow = document.createElement('tr');
             newRow.className = 'threat-row';
             const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
-            
+
             newRow.innerHTML = `
                 <td>${timestamp}</td>
                 <td><strong>${data.src_ip}</strong></td>
@@ -77,9 +156,38 @@
                 <td>${data.proto}</td>
                 <td class="score-high">${data.score}</td>
             `;
-            
+
             tableBody.insertBefore(newRow, tableBody.firstChild);
         });
+
+        function exportTableToCSV(filename) {
+            var csv = [];
+            var rows = document.querySelectorAll("table tr");
+
+            for (var i = 0; i < rows.length; i++) {
+                var row = [],
+                    cols = rows[i].querySelectorAll("td, th");
+
+                for (var j = 0; j < cols.length; j++) {
+                    let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, "").replace(/,/g, "");
+                    row.push(data);
+                }
+                csv.push(row.join(","));
+            }
+
+
+            var csvFile = new Blob([csv.join("\n")], {
+                type: "text/csv"
+            });
+            var downloadLink = document.createElement("a");
+            downloadLink.download = filename;
+            downloadLink.href = window.URL.createObjectURL(csvFile);
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
     </script>
 </body>
+
 </html>
