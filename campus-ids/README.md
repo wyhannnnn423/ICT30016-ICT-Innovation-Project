@@ -1,4 +1,4 @@
-# Campus IDS - ICT30016 (ICT Innovation Project)
+# Campus IDS Ver2 - ICT30016 (ICT Innovation Project) 
 
 A lightweight Intrusion Detection System (IDS) for campus networks. It reads network traffic from Suricata and shows alerts on a real-time web dashboard. Alerts come from three detection layers that work side by side.
 
