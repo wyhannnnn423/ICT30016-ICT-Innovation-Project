@@ -7,93 +7,30 @@
     <title>Campus IDS - Real-Time Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
-            margin: 0;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        
-        h1 {
-            color: #2c3e50;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
-            margin-top: 0;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 4px;
-            background-color: #f39c12;
-            color: white;
-            font-size: 0.9em;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        
-        th,
-        td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #ecf0f1;
-        }
-        
-        th {
-            background-color: #34495e;
-            color: white;
-            font-weight: 600;
-        }
-        
-        .threat-row {
-            background-color: #fff3cd;
-            color: #856404;
-            animation: slideDown 0.4s ease-out;
-        }
-        
-        .threat-row td {
-            border-bottom: 1px solid #ffeeba;
-        }
-        
-        .score-high {
-            color: #c0392b;
-            font-weight: bold;
-        }
-        
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-15px);
-                background-color: #ffc107;
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-                background-color: #fff3cd;
-            }
-        }
-        
-        .empty-msg {
-            text-align: center;
-            padding: 30px;
-            color: #7f8c8d;
-            font-style: italic;
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 0; }
+        .status-badge { display: inline-block; padding: 6px 12px; border-radius: 4px; background-color: #f39c12; color: white; font-size: 0.9em; font-weight: bold; margin-bottom: 20px; }
+        .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+        .counter { padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; color: white; }
+        .counter.rule { background: #c0392b; }
+        .counter.ml { background: #e67e22; }
+        .counter.stats { background: #2980b9; }
+        .spacer { flex: 1; }
+        select, button { padding: 5px 12px; border-radius: 4px; border: 1px solid #bdc3c7; font-size: 0.9em; }
+        button { background-color: #0d6efd; color: white; border: none; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #ecf0f1; }
+        th { background-color: #34495e; color: white; font-weight: 600; }
+        .row-ml { background-color: #fff3cd; color: #856404; animation: slideDown 0.4s ease-out; }
+        .row-rule { background-color: #fdecea; color: #922b21; animation: slideDown 0.4s ease-out; }
+        .row-stats { background-color: #e8f1fa; color: #1f4e79; animation: slideDown 0.4s ease-out; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 0.8em; font-weight: bold; color: white; }
+        .tag.rule { background: #c0392b; }
+        .tag.ml { background: #e67e22; }
+        .score-high { color: #c0392b; font-weight: bold; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-15px); } to { opacity: 1; transform: translateY(0); } }
+        .empty-msg { text-align: center; padding: 30px; color: #7f8c8d; font-style: italic; }
     </style>
 </head>
 
@@ -101,22 +38,39 @@
     <div class="container">
         <h1>🛡️ Campus IDS Real-Time Alerts</h1>
         <div class="status-badge" id="connection-status">Connecting to Detection Engine...</div>
-        <button onclick="exportTableToCSV('campus_ids_alerts.csv')" style="float: right; margin-bottom: 10px; padding: 5px 15px; background-color: #0d6efd; color: white; border: none; border-radius: 4px; cursor: pointer;">
-    ⬇️ Export to CSV
-</button>
+
+        <div class="toolbar">
+            <span class="counter rule">Rule alerts: <span id="count-rule">0</span></span>
+            <span class="counter ml">ML anomalies: <span id="count-ml">0</span></span>
+            <span class="counter stats">Scan/flood: <span id="count-stats">0</span></span>
+            <span class="spacer"></span>
+            <label>Show:
+                <select id="filter" onchange="applyFilter()">
+                    <option value="all">All</option>
+                    <option value="Rule">Rule alerts only</option>
+                    <option value="ML">ML anomalies only</option>
+                    <option value="Stats">Scan/flood only</option>
+                </select>
+            </label>
+            <button onclick="exportTableToCSV('campus_ids_alerts.csv')">⬇️ Export to CSV</button>
+        </div>
+
         <table>
             <thead>
                 <tr>
                     <th>Timestamp</th>
+                    <th>Source</th>
                     <th>Source IP</th>
                     <th>Destination IP</th>
                     <th>Protocol</th>
+                    <th>Detail</th>
+                    <th>Severity</th>
                     <th>Anomaly Score</th>
                 </tr>
             </thead>
             <tbody id="alert-table-body">
                 <tr id="empty-row">
-                    <td colspan="5" class="empty-msg">No threats detected yet. Monitoring live traffic...</td>
+                    <td colspan="8" class="empty-msg">No threats detected yet. Monitoring live traffic...</td>
                 </tr>
             </tbody>
         </table>
@@ -124,61 +78,77 @@
 
     <script>
         const socket = io();
+        const counts = { Rule: 0, ML: 0, Stats: 0 };
+        const rowClass = { Rule: 'row-rule', ML: 'row-ml', Stats: 'row-stats' };
 
-        socket.on('connect', function() {
+        socket.on('connect', function () {
             const statusEl = document.getElementById('connection-status');
             statusEl.textContent = "Live: Engine Active & Monitoring";
             statusEl.style.backgroundColor = "#2ecc71";
         });
 
-        socket.on('disconnect', function() {
+        socket.on('disconnect', function () {
             const statusEl = document.getElementById('connection-status');
             statusEl.textContent = "Disconnected from Engine";
             statusEl.style.backgroundColor = "#e74c3c";
         });
 
-        socket.on('new_alert', function(data) {
+        function addCell(row, text, className) {
+            const td = document.createElement('td');
+            td.textContent = text;           // textContent: rule text can't inject HTML
+            if (className) td.className = className;
+            row.appendChild(td);
+            return td;
+        }
+
+        socket.on('new_alert', function (data) {
             const tableBody = document.getElementById('alert-table-body');
             const emptyRow = document.getElementById('empty-row');
+            if (emptyRow) emptyRow.remove();
 
-            if (emptyRow) {
-                emptyRow.remove();
-            }
+            const src = (data.source in counts) ? data.source : 'ML';
+            counts[src]++;
+            document.getElementById('count-rule').textContent = counts.Rule;
+            document.getElementById('count-ml').textContent = counts.ML;
+            document.getElementById('count-stats').textContent = counts.Stats;
 
-            const newRow = document.createElement('tr');
-            newRow.className = 'threat-row';
-            const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+            const row = document.createElement('tr');
+            row.className = rowClass[src];
+            row.dataset.source = src;
 
-            newRow.innerHTML = `
-                <td>${timestamp}</td>
-                <td><strong>${data.src_ip}</strong></td>
-                <td>${data.dest_ip}</td>
-                <td>${data.proto}</td>
-                <td class="score-high">${data.score}</td>
-            `;
+            const time = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+            addCell(row, time);
+            addCell(row, src);
+            addCell(row, data.src_ip);
+            addCell(row, data.dest_ip);
+            addCell(row, data.proto);
+            addCell(row, data.detail || '');
+            addCell(row, data.severity || '-');
+            addCell(row, data.score === null || data.score === undefined ? '-' : data.score, src === 'ML' ? 'score-high' : '');
 
-            tableBody.insertBefore(newRow, tableBody.firstChild);
+            tableBody.insertBefore(row, tableBody.firstChild);
+            applyFilter();
         });
+
+        function applyFilter() {
+            const f = document.getElementById('filter').value;
+            document.querySelectorAll('#alert-table-body tr[data-source]').forEach(function (r) {
+                r.style.display = (f === 'all' || r.dataset.source === f) ? '' : 'none';
+            });
+        }
 
         function exportTableToCSV(filename) {
             var csv = [];
             var rows = document.querySelectorAll("table tr");
-
             for (var i = 0; i < rows.length; i++) {
-                var row = [],
-                    cols = rows[i].querySelectorAll("td, th");
-
+                if (rows[i].style.display === 'none') continue;   // export only what the filter shows
+                var row = [], cols = rows[i].querySelectorAll("td, th");
                 for (var j = 0; j < cols.length; j++) {
-                    let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, "").replace(/,/g, "");
-                    row.push(data);
+                    row.push(cols[j].innerText.replace(/(\r\n|\n|\r)/gm, "").replace(/,/g, ";"));
                 }
                 csv.push(row.join(","));
             }
-
-
-            var csvFile = new Blob([csv.join("\n")], {
-                type: "text/csv"
-            });
+            var csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
             var downloadLink = document.createElement("a");
             downloadLink.download = filename;
             downloadLink.href = window.URL.createObjectURL(csvFile);
