@@ -6,3 +6,5 @@ venv/
 .DS_Store
 data/*.csv
 !data/.gitkeep
+# CIC-IDS2017 benchmark files are very large (30-80 MB each): do not commit them
+evaluation/*.csv
