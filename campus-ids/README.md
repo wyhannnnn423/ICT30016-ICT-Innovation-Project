@@ -29,7 +29,7 @@ The dashboard can filter by layer, shows a counter per layer, and exports the sh
 
 **Version 1 - Isolation Forest only.** We started with an unsupervised Isolation Forest, because we had no labelled attack data and the client wanted a lightweight tool. We trained it on about 29,500 flows (about 16.5 hours) of our own baseline traffic.
 
-**What we found.** Tested against CIC-IDS2017 (Friday DDoS and PortScan files), the false-positive rate on normal traffic was low (0.8%), but the detection rate was **0% for DDoS and 0% for PortScan**. The model looks at one flow at a time (packets, bytes, duration). A port scan or flood is made of many small, normal-looking flows, so a single flow does not look unusual.
+**What we found.** Tested against CIC-IDS2017 (Friday DDoS and PortScan files), the false-positive rate on normal traffic was low (0.02%), but the detection rate was **0% for DDoS and 0% for PortScan**. The model looks at one flow at a time (packets, bytes, duration). A port scan or flood is made of many small, normal-looking flows, so a single flow does not look unusual.
 
 **Version 2 - hybrid detection (current).** Instead of replacing the model, we kept the Isolation Forest and added two layers that are good at what it misses:
 - the **Rule layer**: Suricata already matches known patterns, so we only added two small rules;
