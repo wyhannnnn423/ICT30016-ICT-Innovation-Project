@@ -29,6 +29,13 @@ def parse_eve_json(input_path: str) -> pd.DataFrame:
                 continue
                 
             flow = event.get("flow", {})
+            
+            # --- NEW FILTER LOGIC: Drop micro-flows to prevent web browsing false alarms ---
+            total_pkts = flow.get("pkts_toserver", 0) + flow.get("pkts_toclient", 0)
+            if total_pkts < 15:
+                continue
+            # -------------------------------------------------------------------------------
+        
             record = {
                 "timestamp": event.get("timestamp"),
                 "src_ip": event.get("src_ip"),

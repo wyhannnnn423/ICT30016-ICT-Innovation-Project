@@ -1,0 +1,9 @@
+# Campus IDS custom Suricata rules (ICT30016)
+# Copy this file into Suricata's rules folder and list it under "rule-files:" in suricata.yaml.
+# Each rule must stay on ONE line.
+
+# Test rule: someone pings a protected host (ICMP echo request, IPv4 only)
+alert icmp any any -> $HOME_NET any (msg:"LOCAL Test - ICMP ping received"; itype:8; priority:3; sid:1000101; rev:1;)
+
+# 20 or more SYN packets from the same source within 5 seconds -> possible port scan or SYN flood
+alert tcp any any -> $HOME_NET any (msg:"LOCAL SYN burst - possible port scan or SYN flood"; flags:S,12; detection_filter:track by_src, count 20, seconds 5; priority:2; sid:1000102; rev:1;)
