@@ -48,7 +48,7 @@ CIC-IDS2017 cross-dataset test (ML layer only, trained on our baseline):
 
 | Test data | Result |
 |---|---|
-| BENIGN flows flagged (false positives) | 0.8% |
+| BENIGN flows flagged (false positives) | 0.02% |
 | DDoS detected | 0% |
 | PortScan detected | 0% |
 
