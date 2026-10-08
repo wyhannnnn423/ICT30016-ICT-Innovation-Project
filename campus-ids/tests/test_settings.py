@@ -205,6 +205,38 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(d.process(rule_event("10.0.0.50", dest="192.168.50.77")), [])
 
 
+class StatsTargetTests(unittest.TestCase):
+    def test_flood_alert_names_the_main_target_not_the_last_flow(self):
+        d = Detector(model_path=None, scaler_path=None, flood_flows=50)
+        out = []
+        for i in range(60):                                   # mostly TCP to the PC ...
+            ev = flow_event("10.0.0.7", 1000 + i, dest="192.168.50.190")
+            ev["proto"] = "TCP"
+            out += d.process(ev, now=100 + i * 0.01)
+        last = flow_event("10.0.0.7", 53, dest="192.168.50.1")  # ... then one UDP flow to the router
+        last["proto"] = "UDP"
+        d2 = Detector(model_path=None, scaler_path=None, flood_flows=61, scan_ports=500)
+        out2 = []
+        for i in range(60):
+            ev = flow_event("10.0.0.7", 1000 + i, dest="192.168.50.190")
+            ev["proto"] = "TCP"
+            out2 += d2.process(ev, now=100 + i * 0.01)
+        out2 += d2.process(last, now=101)
+        stats = [a for a in out2 if a["source"] == "Stats"]
+        self.assertEqual(len(stats), 1)
+        self.assertEqual(stats[0]["dest_ip"], "192.168.50.190")
+        self.assertEqual(stats[0]["proto"], "TCP")
+        self.assertIn("most to 192.168.50.190", stats[0]["detail"])
+
+    def test_scan_alert_names_the_scanned_host(self):
+        d = Detector(model_path=None, scaler_path=None, scan_ports=5)
+        out = []
+        for port in range(1, 8):
+            out += d.process(flow_event("10.0.0.8", port, dest="192.168.50.190"), now=200 + port * 0.01)
+        self.assertEqual(out[0]["dest_ip"], "192.168.50.190")
+        self.assertIn("5+ different ports", out[0]["detail"])
+
+
 class NetworkFollowTests(unittest.TestCase):
     def make(self, **kw):
         return Detector(model_path=None, scaler_path=None, **kw)

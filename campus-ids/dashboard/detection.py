@@ -160,12 +160,13 @@ class Detector:
         if self.is_ignored(event.get("src_ip")):
             return []
         out = []
-        for a in self.stats.add(event.get("src_ip"), event.get("dest_ip"), event.get("dest_port"), now=now):
+        for a in self.stats.add(event.get("src_ip"), event.get("dest_ip"), event.get("dest_port"), now=now,
+                                   proto=event.get("proto")):
             out.append({
                 "timestamp": event.get("timestamp"),
                 "src_ip": event.get("src_ip"),
-                "dest_ip": event.get("dest_ip"),
-                "proto": event.get("proto", "Unknown"),
+                "dest_ip": a.get("dest_ip") or event.get("dest_ip"),
+                "proto": a.get("proto") or event.get("proto", "Unknown"),
                 "source": "Stats",
                 "detail": a["detail"],
                 "severity": a["severity"],
