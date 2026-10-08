@@ -7,101 +7,675 @@
     <title>Campus IDS - Real-Time Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-        h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 0; }
-        .status-badge { display: inline-block; padding: 6px 12px; border-radius: 4px; background-color: #f39c12; color: white; font-size: 0.9em; font-weight: bold; margin-bottom: 20px; }
-        .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
-        .counter { padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; color: white; }
-        .counter.rule { background: #c0392b; }
-        .counter.ml { background: #e67e22; }
-        .counter.stats { background: #2980b9; }
-        .spacer { flex: 1; }
-        select, button { padding: 5px 12px; border-radius: 4px; border: 1px solid #bdc3c7; font-size: 0.9em; }
-        button { background-color: #0d6efd; color: white; border: none; cursor: pointer; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #ecf0f1; }
-        th { background-color: #34495e; color: white; font-weight: 600; }
-        .row-ml { background-color: #fff3cd; color: #856404; animation: slideDown 0.4s ease-out; }
-        .row-rule { background-color: #fdecea; color: #922b21; animation: slideDown 0.4s ease-out; }
-        .row-stats { background-color: #e8f1fa; color: #1f4e79; animation: slideDown 0.4s ease-out; }
-        .tag { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 0.8em; font-weight: bold; color: white; }
-        .tag.rule { background: #c0392b; }
-        .tag.ml { background: #e67e22; }
-        .score-high { color: #c0392b; font-weight: bold; }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-15px); } to { opacity: 1; transform: translateY(0); } }
-        .empty-msg { text-align: center; padding: 30px; color: #7f8c8d; font-style: italic; }
+         :root {
+            --bg: #0e1726;
+            --panel: #152238;
+            --line: #243653;
+            --text: #e8eef7;
+            --muted: #8fa3bf;
+            --rule: #ff6b57;
+            --stats: #3cc8e8;
+            --ml: #f2b94b;
+            --accent: #4a7de0
+        }
+        
+        * {
+            box-sizing: border-box
+        }
+        
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font: 15px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+            font-variant-numeric: tabular-nums
+        }
+        
+        .container {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 28px 24px 48px
+        }
+        
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 6px
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 1.7rem;
+            font-weight: 650;
+            letter-spacing: -.01em
+        }
+        
+        h2 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600
+        }
+        
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: .85rem;
+            background: #3a2f12;
+            color: var(--ml)
+        }
+        
+        .status-badge.ok {
+            background: #0f3a2c;
+            color: #6ee7b0
+        }
+        
+        .status-badge.bad {
+            background: #40181b;
+            color: #ff8a8a
+        }
+        
+        .ignore-summary {
+            font-size: .85rem;
+            color: var(--muted);
+            margin: 2px 0 6px
+        }
+        
+        .capture-line {
+            display: none;
+            font-size: .88rem;
+            margin: 4px 0 8px;
+            padding: 7px 12px;
+            border-radius: 6px
+        }
+        
+        .capture-ok {
+            background: #0f3a2c;
+            color: #6ee7b0
+        }
+        
+        .capture-warn {
+            background: #3a2f12;
+            color: #f2c76a
+        }
+        
+        .capture-info {
+            background: #1b2a43;
+            color: var(--muted)
+        }
+        
+        .hero,
+        .duo section {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 16px 18px
+        }
+        
+        .hero {
+            margin: 12px 0
+        }
+        
+        .hero-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 8px
+        }
+        
+        .legend {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+        
+        .lg {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--line);
+            padding: 5px 12px;
+            border-radius: 999px;
+            display: flex;
+            gap: 7px;
+            align-items: center;
+            font-size: .88rem
+        }
+        
+        .lg:hover {
+            border-color: var(--muted)
+        }
+        
+        .lg.dim {
+            opacity: .4
+        }
+        
+        .lg b {
+            font-weight: 650
+        }
+        
+        .lg i {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block
+        }
+        
+        .lg-rule i {
+            background: var(--rule)
+        }
+        
+        .lg-stats i {
+            background: var(--stats)
+        }
+        
+        .lg-ml i {
+            background: var(--ml)
+        }
+        
+        .chart svg {
+            width: 100%;
+            height: auto;
+            display: block
+        }
+        
+        .grid {
+            stroke: var(--line);
+            stroke-width: 1
+        }
+        
+        .axis {
+            fill: var(--muted);
+            font-size: 10px
+        }
+        
+        .big {
+            fill: var(--text);
+            font-size: 22px;
+            font-weight: 650
+        }
+        
+        .ring {
+            fill: none;
+            stroke: var(--line);
+            stroke-width: 14
+        }
+        
+        .duo {
+            display: grid;
+            grid-template-columns: minmax(260px, 1fr) 2fr;
+            gap: 12px;
+            margin-bottom: 14px
+        }
+        
+        .duo h2 {
+            margin-bottom: 10px
+        }
+        
+        .donut-wrap {
+            display: flex;
+            align-items: center;
+            gap: 16px
+        }
+        
+        .donut {
+            width: 150px;
+            height: 150px;
+            flex: none
+        }
+        
+        .empty {
+            color: var(--muted);
+            font-size: .9rem
+        }
+        
+        .bar-row {
+            display: grid;
+            grid-template-columns: minmax(120px, 190px) 1fr 34px;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0;
+            font-size: .88rem
+        }
+        
+        .track {
+            height: 8px;
+            background: var(--line);
+            border-radius: 4px;
+            overflow: hidden
+        }
+        
+        .fill {
+            height: 100%;
+            border-radius: 4px
+        }
+        
+        .bar-row .n {
+            text-align: right;
+            color: var(--muted)
+        }
+        
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            margin: 6px 0 10px
+        }
+        
+        .toolbar label {
+            color: var(--muted);
+            font-size: .9rem
+        }
+        
+        select,
+        input,
+        textarea {
+            background: #0b1322;
+            color: var(--text);
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            padding: 6px 9px;
+            font: inherit
+        }
+        
+        input[type=checkbox] {
+            padding: 0;
+            accent-color: var(--stats)
+        }
+        
+        button {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 7px 14px;
+            font: inherit;
+            font-size: .9rem;
+            cursor: pointer
+        }
+        
+        button.gray {
+            background: #2a3b5a
+        }
+        
+        button:disabled {
+            opacity: .5;
+            cursor: not-allowed
+        }
+        
+         :focus-visible {
+            outline: 2px solid var(--stats);
+            outline-offset: 2px
+        }
+        
+        .table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: var(--panel)
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse
+        }
+        
+        th,
+        td {
+            padding: 9px 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--line);
+            font-size: .9rem
+        }
+        
+        th {
+            color: var(--muted);
+            font-weight: 600;
+            font-size: .82rem;
+            background: #101c30
+        }
+        
+        tr:last-child td {
+            border-bottom: none
+        }
+        
+        .row-rule,
+        .row-stats,
+        .row-ml {
+            animation: fresh 1.6s ease-out
+        }
+        
+        .row-rule {
+            background: rgba(255, 107, 87, .07)
+        }
+        
+        .row-stats {
+            background: rgba(60, 200, 232, .07)
+        }
+        
+        .row-ml {
+            background: rgba(242, 185, 75, .07)
+        }
+        
+        .row-rule td:first-child {
+            box-shadow: inset 3px 0 0 var(--rule)
+        }
+        
+        .row-stats td:first-child {
+            box-shadow: inset 3px 0 0 var(--stats)
+        }
+        
+        .row-ml td:first-child {
+            box-shadow: inset 3px 0 0 var(--ml)
+        }
+        
+        td:nth-child(2) {
+            font-weight: 600
+        }
+        
+        .row-rule td:nth-child(2) {
+            color: var(--rule)
+        }
+        
+        .row-stats td:nth-child(2) {
+            color: var(--stats)
+        }
+        
+        .row-ml td:nth-child(2) {
+            color: var(--ml)
+        }
+        
+        @keyframes fresh {
+            from {
+                background-color: rgba(255, 255, 255, .2)
+            }
+        }
+        
+        .score-high {
+            color: var(--ml);
+            font-weight: 600
+        }
+        
+        .empty-msg {
+            text-align: center;
+            padding: 28px;
+            color: var(--muted)
+        }
+        
+        #settings-panel {
+            display: none;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 16px 18px;
+            margin: 0 0 14px
+        }
+        
+        #settings-panel h2 {
+            margin-bottom: 4px
+        }
+        
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 16px;
+            margin-top: 10px
+        }
+        
+        .field label {
+            display: block;
+            font-weight: 600;
+            font-size: .88rem;
+            margin-bottom: 4px
+        }
+        
+        .field input[type=text],
+        .field input[type=number],
+        .field textarea {
+            width: 100%
+        }
+        
+        .field .check-line {
+            font-weight: 400;
+            font-size: .85rem;
+            margin-top: 6px
+        }
+        
+        .hint {
+            color: var(--muted);
+            font-size: .8rem;
+            margin-top: 4px
+        }
+        
+        .settings-actions {
+            margin-top: 14px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap
+        }
+        
+        .msg-ok {
+            color: #6ee7b0
+        }
+        
+        .msg-err {
+            color: #ff8a8a
+        }
+        
+        .link-btn {
+            background: none;
+            color: var(--stats);
+            padding: 0;
+            text-decoration: underline;
+            font-size: inherit
+        }
+        
+        details.demo {
+            margin-top: 14px
+        }
+        
+        details.demo summary {
+            cursor: pointer;
+            font-weight: 600;
+            font-size: .9rem
+        }
+        
+        .cmd-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 6px
+        }
+        
+        .cmd-row code {
+            flex: 1;
+            background: #0b1322;
+            border: 1px solid var(--line);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font: .85rem Consolas, monospace;
+            overflow-x: auto;
+            white-space: nowrap
+        }
+        
+        @media (max-width:760px) {
+            .duo {
+                grid-template-columns: 1fr
+            }
+            .donut-wrap {
+                flex-direction: column;
+                align-items: flex-start
+            }
+            .toolbar {
+                justify-content: flex-start
+            }
+        }
+        
+        @media (prefers-reduced-motion:reduce) {
+            * {
+                animation: none!important
+            }
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>🛡️ Campus IDS Real-Time Alerts</h1>
-        <div class="status-badge" id="connection-status">Connecting to Detection Engine...</div>
+        <header class="top">
+            <h1>Campus IDS</h1>
+            <span class="status-badge" id="connection-status">Connecting to detection engine...</span>
+        </header>
+        <div class="ignore-summary" id="ignore-summary"></div>
+        <div class="capture-line" id="capture-line"></div>
+
+        <section class="hero">
+            <div class="hero-head">
+                <h2>Alerts in the last 10 minutes</h2>
+                <div class="legend">
+                    <button class="lg lg-rule" onclick="pick('Rule')"><i></i>Rule alerts <b id="count-rule">0</b></button>
+                    <button class="lg lg-stats" onclick="pick('Stats')"><i></i>Scans and floods <b id="count-stats">0</b></button>
+                    <button class="lg lg-ml" onclick="pick('ML')"><i></i>ML anomalies <b id="count-ml">0</b></button>
+                </div>
+            </div>
+            <div id="chart-timeline" class="chart"></div>
+        </section>
+
+        <div class="duo">
+            <section>
+                <h2>Share by detection layer</h2>
+                <div id="chart-donut" class="donut-wrap"></div>
+            </section>
+            <section>
+                <h2>Busiest sources</h2>
+                <div id="chart-top"></div>
+            </section>
+        </div>
 
         <div class="toolbar">
-            <span class="counter rule">Rule alerts: <span id="count-rule">0</span></span>
-            <span class="counter ml">ML anomalies: <span id="count-ml">0</span></span>
-            <span class="counter stats">Scan/flood: <span id="count-stats">0</span></span>
-            <span class="spacer"></span>
-            <label>Show:
-                <select id="filter" onchange="applyFilter()">
+            <label>Show
+                <select id="filter" onchange="applyFilter(); markLegend()">
                     <option value="all">All</option>
                     <option value="Rule">Rule alerts only</option>
                     <option value="ML">ML anomalies only</option>
-                    <option value="Stats">Scan/flood only</option>
+                    <option value="Stats">Scans and floods only</option>
                 </select>
             </label>
-            <button onclick="exportTableToCSV('campus_ids_alerts.csv')">⬇️ Export to CSV</button>
+            <button class="gray" onclick="toggleSettings()">Settings</button>
+            <button onclick="exportTableToCSV('campus_ids_alerts.csv')">Export to CSV</button>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Source</th>
-                    <th>Source IP</th>
-                    <th>Destination IP</th>
-                    <th>Protocol</th>
-                    <th>Detail</th>
-                    <th>Severity</th>
-                    <th>Anomaly Score</th>
-                </tr>
-            </thead>
-            <tbody id="alert-table-body">
-                <tr id="empty-row">
-                    <td colspan="8" class="empty-msg">No threats detected yet. Monitoring live traffic...</td>
-                </tr>
-            </tbody>
-        </table>
+        <div id="settings-panel">
+            <h2>Settings</h2>
+            <div class="hint" id="settings-note">Changes apply to new traffic immediately and are kept after a restart.</div>
+            <div class="settings-grid">
+                <div class="field">
+                    <label for="set-own">This PC's IP address</label>
+                    <input id="set-own" type="text" placeholder="e.g. 192.168.50.190">
+                    <label class="check-line"><input id="set-auto" type="checkbox" onchange="syncAuto()"> Detect automatically (follows network changes)</label>
+                    <div class="hint">Alerts coming from this address are hidden (the PC's own browsing is not an attack). Uncheck the box to type an address yourself.
+                        <span id="detected-line"></span></div>
+                </div>
+                <div class="field">
+                    <label for="set-trusted">Trusted IPs or ranges</label>
+                    <textarea id="set-trusted" rows="2" placeholder="e.g. 192.168.50.1, 192.168.50.0/28"></textarea>
+                    <div class="hint">Router, your phone, a lab server... Alerts from these sources are hidden. Separate with commas.</div>
+                </div>
+                <div class="field">
+                    <label for="set-scan_ports">Port scan: different ports</label>
+                    <input id="set-scan_ports" type="number" min="2" max="1000">
+                    <div class="hint">Different ports on one host within the time window (2 to 1000).</div>
+                </div>
+                <div class="field">
+                    <label for="set-flood_flows">Flood: connections</label>
+                    <input id="set-flood_flows" type="number" min="10" max="100000">
+                    <div class="hint">Connections from one source within the time window (10 to 100000).</div>
+                </div>
+                <div class="field">
+                    <label for="set-window">Time window (seconds)</label>
+                    <input id="set-window" type="number" min="1" max="300">
+                    <div class="hint">How far back the detector looks (1 to 300).</div>
+                </div>
+                <div class="field">
+                    <label for="set-cooldown">Cooldown (seconds)</label>
+                    <input id="set-cooldown" type="number" min="0" max="3600">
+                    <div class="hint">Wait this long before the same source raises the same alert again (0 to 3600).</div>
+                </div>
+            </div>
+            <details class="demo">
+                <summary>Attack commands for the Kali VM (target = this PC)</summary>
+                <div class="hint">The address is filled in for you and follows the network. Run them from a second device, never from this PC.</div>
+                <div id="demo-commands"></div>
+            </details>
+            <div class="settings-actions">
+                <button id="btn-save" onclick="saveSettings()">Save</button>
+                <button id="btn-reset" class="gray" onclick="resetDefaults()">Reset to defaults</button>
+                <span id="settings-msg"></span>
+            </div>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Source</th>
+                        <th>Source IP</th>
+                        <th>Destination IP</th>
+                        <th>Protocol</th>
+                        <th>Detail</th>
+                        <th>Severity</th>
+                        <th>Anomaly Score</th>
+                    </tr>
+                </thead>
+                <tbody id="alert-table-body">
+                    <tr id="empty-row">
+                        <td colspan="8" class="empty-msg">No threats detected yet. Monitoring live traffic...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script>
         const socket = io();
-        const counts = { Rule: 0, ML: 0, Stats: 0 };
-        const rowClass = { Rule: 'row-rule', ML: 'row-ml', Stats: 'row-stats' };
+        const counts = {
+            Rule: 0,
+            ML: 0,
+            Stats: 0
+        };
+        const rowClass = {
+            Rule: 'row-rule',
+            ML: 'row-ml',
+            Stats: 'row-stats'
+        };
 
-        socket.on('connect', function () {
+        socket.on('connect', function() {
             const statusEl = document.getElementById('connection-status');
             statusEl.textContent = "Live: Engine Active & Monitoring";
-            statusEl.style.backgroundColor = "#2ecc71";
+            statusEl.className = 'status-badge ok';
         });
 
-        socket.on('disconnect', function () {
+        socket.on('disconnect', function() {
             const statusEl = document.getElementById('connection-status');
             statusEl.textContent = "Disconnected from Engine";
-            statusEl.style.backgroundColor = "#e74c3c";
+            statusEl.className = 'status-badge bad';
         });
 
         function addCell(row, text, className) {
             const td = document.createElement('td');
-            td.textContent = text;           // textContent: rule text can't inject HTML
+            td.textContent = text; // textContent: rule text can't inject HTML
             if (className) td.className = className;
             row.appendChild(td);
             return td;
         }
 
-        socket.on('new_alert', function (data) {
+        socket.on('new_alert', function(data) {
             const tableBody = document.getElementById('alert-table-body');
             const emptyRow = document.getElementById('empty-row');
             if (emptyRow) emptyRow.remove();
@@ -111,6 +685,7 @@
             document.getElementById('count-rule').textContent = counts.Rule;
             document.getElementById('count-ml').textContent = counts.ML;
             document.getElementById('count-stats').textContent = counts.Stats;
+            recordAlert(src, data.src_ip);
 
             const row = document.createElement('tr');
             row.className = rowClass[src];
@@ -130,9 +705,375 @@
             applyFilter();
         });
 
+        // ---------------- settings panel ----------------
+        let settingsDefaults = {};
+        let detectedIp = null;
+        const NUM_KEYS = ['scan_ports', 'flood_flows', 'window', 'cooldown'];
+
+        function $(id) {
+            return document.getElementById(id);
+        }
+
+        function splitList(text) {
+            return text.split(/[,;\s]+/).filter(Boolean);
+        }
+
+        function setMessage(text, ok) {
+            const el = $('settings-msg');
+            el.textContent = text;
+            el.className = ok ? 'msg-ok' : 'msg-err';
+        }
+
+        function syncAuto() {
+            $('set-own').disabled = $('set-auto').checked || $('set-auto').disabled;
+        }
+
+        function fillForm(s) {
+            $('set-auto').checked = s.auto_own_ip !== false;
+            $('set-own').value = (s.own_ips || []).join(', ');
+            $('set-trusted').value = (s.trusted_ips || []).join(', ');
+            NUM_KEYS.forEach(function(k) {
+                $('set-' + k).value = s[k];
+            });
+        }
+
+        function updateSummary(s) {
+            const ignored = (s.own_ips || []).concat(s.trusted_ips || []);
+            const who = ignored.length ? 'Hiding Rule/Stats alerts from: ' + ignored.join(', ') :
+                'Not hiding any source (alerts from this PC are shown).';
+            $('ignore-summary').textContent = who + '  |  Scan: ' + s.scan_ports + ' ports, flood: ' +
+                s.flood_flows + ' connections, within ' + s.window + ' s';
+        }
+
+        function setEditable(canEdit) {
+            ['set-auto', 'set-trusted'].concat(NUM_KEYS.map(function(k) {
+                    return 'set-' + k;
+                }))
+                .forEach(function(id) {
+                    $(id).disabled = !canEdit;
+                });
+            syncAuto();
+            $('btn-save').disabled = !canEdit;
+            $('btn-reset').disabled = !canEdit;
+            $('settings-note').textContent = canEdit ?
+                'Changes apply to new traffic immediately and are kept after a restart.' :
+                'View only: settings can be changed only from the PC that runs the dashboard.';
+        }
+
+        function showDetected() {
+            const line = $('detected-line');
+            line.textContent = '';
+            if (!detectedIp) return;
+            line.appendChild(document.createTextNode('Detected on this PC: ' + detectedIp + ' '));
+            const b = document.createElement('button');
+            b.className = 'link-btn';
+            b.textContent = 'use it';
+            b.onclick = function() {
+                $('set-own').value = detectedIp;
+            };
+            line.appendChild(b);
+        }
+
+        async function loadSettings() {
+            try {
+                const r = await fetch('/api/settings');
+                const d = await r.json();
+                settingsDefaults = d.defaults;
+                detectedIp = d.detected_ip;
+                fillForm(d.settings);
+                updateSummary(d.settings);
+                showDetected();
+                setEditable(d.can_edit);
+                renderDemoCommands(d.settings.own_ips[0] || detectedIp);
+                lastOwn = JSON.stringify(d.settings.own_ips) + d.settings.auto_own_ip;
+            } catch (e) {
+                $('ignore-summary').textContent = 'Could not load the settings.';
+            }
+        }
+
+        function toggleSettings() {
+            const panel = $('settings-panel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        }
+
+        async function saveSettings() {
+            const body = {
+                auto_own_ip: $('set-auto').checked,
+                own_ips: splitList($('set-own').value),
+                trusted_ips: splitList($('set-trusted').value)
+            };
+            NUM_KEYS.forEach(function(k) {
+                const v = $('set-' + k).value.trim();
+                body[k] = /^\d+$/.test(v) ? parseInt(v, 10) : v; // text is sent as-is and rejected by the server
+            });
+            try {
+                const r = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+                const d = await r.json();
+                if (d.ok) {
+                    fillForm(d.settings);
+                    updateSummary(d.settings);
+                    renderDemoCommands(d.settings.own_ips[0] || detectedIp);
+                    syncAuto();
+                    setMessage(d.warning ? d.warning : 'Saved.', !d.warning);
+                } else {
+                    setMessage((d.errors || ['Could not save.']).join(' '), false);
+                }
+            } catch (e) {
+                setMessage('Could not reach the dashboard server.', false);
+            }
+        }
+
+        function resetDefaults() {
+            const d = Object.assign({}, settingsDefaults);
+            d.own_ips = detectedIp ? [detectedIp] : [];
+            fillForm(d);
+            syncAuto();
+            setMessage('Defaults loaded. Press Save to apply them.', true);
+        }
+
+        // ---------------- charts (plain SVG, no internet needed) ----------------
+        const COLORS = {
+            Rule: '#ff6b57',
+            Stats: '#3cc8e8',
+            ML: '#f2b94b'
+        };
+        const LAYERS = ['Rule', 'Stats', 'ML'];
+        const alertsLog = []; // what arrived since this page was opened
+
+        function recordAlert(src, ip) {
+            alertsLog.push({
+                t: Date.now(),
+                source: src,
+                ip: ip
+            });
+            if (alertsLog.length > 5000) alertsLog.shift();
+            renderCharts();
+        }
+
+        function pick(src) {
+            const f = $('filter');
+            f.value = f.value === src ? 'all' : src;
+            applyFilter();
+            markLegend();
+        }
+
+        function markLegend() {
+            const f = $('filter').value;
+            document.querySelectorAll('.lg').forEach(function(b) {
+                b.classList.toggle('dim', f !== 'all' && !b.classList.contains('lg-' + f.toLowerCase()));
+            });
+        }
+
+        function renderTimeline() {
+            const BINS = 20,
+                SPAN = 30000,
+                now = Date.now(),
+                start = now - BINS * SPAN;
+            const bins = [];
+            for (let i = 0; i < BINS; i++) bins.push({
+                Rule: 0,
+                Stats: 0,
+                ML: 0
+            });
+            alertsLog.forEach(function(a) {
+                if (a.t >= start) bins[Math.min(BINS - 1, Math.floor((a.t - start) / SPAN))][a.source]++;
+            });
+            const max = Math.max(4, Math.max.apply(null, bins.map(function(b) {
+                return b.Rule + b.Stats + b.ML;
+            })));
+            const W = 640,
+                H = 190,
+                L = 28,
+                R = 8,
+                T = 8,
+                B = 24,
+                cw = (W - L - R) / BINS,
+                ch = H - T - B;
+            let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Alerts per 30 seconds, stacked by detection layer">';
+            [0, 0.5, 1].forEach(function(f) {
+                const y = T + ch * (1 - f);
+                s += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '"/>' +
+                    '<text class="axis" x="' + (L - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + Math.round(max * f) + '</text>';
+            });
+            bins.forEach(function(b, i) {
+                let y = T + ch;
+                LAYERS.forEach(function(k) {
+                    if (!b[k]) return;
+                    const hgt = ch * b[k] / max;
+                    y -= hgt;
+                    s += '<rect x="' + (L + i * cw + 2) + '" y="' + y + '" width="' + (cw - 4) + '" height="' + hgt + '" rx="2" fill="' + COLORS[k] + '"/>';
+                });
+            });
+            [
+                ['10 min ago', 0, 'start'],
+                ['5 min ago', BINS / 2, 'middle'],
+                ['now', BINS, 'end']
+            ].forEach(function(l) {
+                s += '<text class="axis" x="' + (L + l[1] * cw) + '" y="' + (H - 6) + '" text-anchor="' + l[2] + '">' + l[0] + '</text>';
+            });
+            if (!alertsLog.length) s += '<text class="axis" x="' + (W / 2) + '" y="' + (T + ch / 2) + '" text-anchor="middle" font-size="12">No alerts yet. Waiting for traffic...</text>';
+            $('chart-timeline').innerHTML = s + '</svg>';
+        }
+
+        function renderDonut() {
+            const tot = counts.Rule + counts.Stats + counts.ML,
+                R = 46,
+                C = 2 * Math.PI * R;
+            let s = '<svg class="donut" viewBox="0 0 120 120" role="img" aria-label="Share of alerts by detection layer"><circle class="ring" cx="60" cy="60" r="' + R + '"/>';
+            let off = 0;
+            LAYERS.forEach(function(k) {
+                if (!counts[k]) return;
+                const len = C * counts[k] / tot;
+                s += '<circle cx="60" cy="60" r="' + R + '" fill="none" stroke="' + COLORS[k] + '" stroke-width="14" stroke-dasharray="' + len + ' ' + (C - len) +
+                    '" stroke-dashoffset="' + (-off) + '" transform="rotate(-90 60 60)"/>';
+                off += len;
+            });
+            s += '<text class="big" x="60" y="62" text-anchor="middle">' + tot + '</text><text class="axis" x="60" y="78" text-anchor="middle">alerts</text></svg>';
+            const names = {
+                Rule: 'Rule alerts',
+                Stats: 'Scans and floods',
+                ML: 'ML anomalies'
+            };
+            s += '<div>' + LAYERS.map(function(k) {
+                const pct = tot ? Math.round(100 * counts[k] / tot) : 0;
+                return '<div class="hint" style="margin:3px 0;color:var(--text)"><span style="color:' + COLORS[k] + '">&#9679;</span> ' + names[k] + ' ' + pct + '%</div>';
+            }).join('') + '</div>';
+            $('chart-donut').innerHTML = s;
+        }
+
+        function renderTop() {
+            const per = {};
+            alertsLog.forEach(function(a) {
+                const e = per[a.ip] || (per[a.ip] = {
+                    n: 0,
+                    by: {}
+                });
+                e.n++;
+                e.by[a.source] = (e.by[a.source] || 0) + 1;
+            });
+            const top = Object.keys(per).sort(function(x, y) {
+                return per[y].n - per[x].n;
+            }).slice(0, 5);
+            const box = $('chart-top');
+            box.textContent = '';
+            box.className = top.length ? '' : 'empty';
+            if (!top.length) {
+                box.textContent = 'Nothing yet. The addresses that raise the most alerts appear here.';
+                return;
+            }
+            top.forEach(function(ip) {
+                const e = per[ip];
+                const main = Object.keys(e.by).sort(function(x, y) {
+                    return e.by[y] - e.by[x];
+                })[0];
+                const row = document.createElement('div');
+                row.className = 'bar-row';
+                const name = document.createElement('span');
+                name.textContent = ip;
+                const track = document.createElement('div');
+                track.className = 'track';
+                const fill = document.createElement('div');
+                fill.className = 'fill';
+                fill.style.width = Math.round(100 * e.n / per[top[0]].n) + '%';
+                fill.style.background = COLORS[main];
+                track.appendChild(fill);
+                const n = document.createElement('span');
+                n.className = 'n';
+                n.textContent = e.n;
+                row.appendChild(name);
+                row.appendChild(track);
+                row.appendChild(n);
+                box.appendChild(row);
+            });
+        }
+
+        function renderCharts() {
+            renderTimeline();
+            renderDonut();
+            renderTop();
+        }
+        renderCharts();
+        setInterval(renderTimeline, 1000); // the window keeps sliding even when nothing arrives
+
+        // ---------------- demo commands ----------------
+        function renderDemoCommands(ip) {
+            const box = $('demo-commands');
+            box.textContent = '';
+            if (!ip) {
+                box.textContent = 'No IP address known yet.';
+                return;
+            }
+            ['ping -c 4 ' + ip, 'sudo nmap -sS -p 1-1000 ' + ip, 'sudo hping3 -S -p 80 -i u10000 -c 500 ' + ip]
+            .forEach(function(cmd) {
+                const row = document.createElement('div');
+                row.className = 'cmd-row';
+                const code = document.createElement('code');
+                code.textContent = cmd;
+                const b = document.createElement('button');
+                b.className = 'gray';
+                b.textContent = 'Copy';
+                b.onclick = function() {
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(cmd).then(function() {
+                                b.textContent = 'Copied';
+                            },
+                            function() {
+                                b.textContent = 'Select and copy';
+                            });
+                    } else {
+                        b.textContent = 'Select and copy';
+                    }
+                    setTimeout(function() {
+                        b.textContent = 'Copy';
+                    }, 1500);
+                };
+                row.appendChild(code);
+                row.appendChild(b);
+                box.appendChild(row);
+            });
+        }
+
+        // ---------------- capture check and network changes (polled every 5 s) ----------------
+        let lastOwn = null;
+        const CAPTURE_CLASS = {
+            ok: 'capture-ok',
+            other_traffic: 'capture-warn',
+            idle: 'capture-warn',
+            starting: 'capture-info',
+            unknown: 'capture-info'
+        };
+
+        async function pollStatus() {
+            try {
+                const r = await fetch('/api/status');
+                const d = await r.json();
+                const line = $('capture-line');
+                line.style.display = 'block';
+                line.className = 'capture-line ' + (CAPTURE_CLASS[d.capture.state] || 'capture-info');
+                line.textContent = d.capture.message;
+                const now = JSON.stringify(d.own_ips) + d.auto_own_ip;
+                if (lastOwn !== null && now !== lastOwn) {
+                    loadSettings();
+                } // the PC joined another network
+                lastOwn = now;
+            } catch (e) {
+                $('capture-line').style.display = 'none';
+            }
+        }
+
+        loadSettings();
+        pollStatus();
+        setInterval(pollStatus, 5000);
+
         function applyFilter() {
             const f = document.getElementById('filter').value;
-            document.querySelectorAll('#alert-table-body tr[data-source]').forEach(function (r) {
+            document.querySelectorAll('#alert-table-body tr[data-source]').forEach(function(r) {
                 r.style.display = (f === 'all' || r.dataset.source === f) ? '' : 'none';
             });
         }
@@ -141,14 +1082,17 @@
             var csv = [];
             var rows = document.querySelectorAll("table tr");
             for (var i = 0; i < rows.length; i++) {
-                if (rows[i].style.display === 'none') continue;   // export only what the filter shows
-                var row = [], cols = rows[i].querySelectorAll("td, th");
+                if (rows[i].style.display === 'none') continue; // export only what the filter shows
+                var row = [],
+                    cols = rows[i].querySelectorAll("td, th");
                 for (var j = 0; j < cols.length; j++) {
                     row.push(cols[j].innerText.replace(/(\r\n|\n|\r)/gm, "").replace(/,/g, ";"));
                 }
                 csv.push(row.join(","));
             }
-            var csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
+            var csvFile = new Blob([csv.join("\n")], {
+                type: "text/csv"
+            });
             var downloadLink = document.createElement("a");
             downloadLink.download = filename;
             downloadLink.href = window.URL.createObjectURL(csvFile);

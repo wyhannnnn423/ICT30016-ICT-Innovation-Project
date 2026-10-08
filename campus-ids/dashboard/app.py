@@ -1,199 +1,165 @@
 """
 app.py
 ------------------------
-Flask Real-Time Dashboard Backend (hybrid detection).
+Flask real-time dashboard for the Campus IDS.
 
-Tails Suricata's eve.json and pushes three kinds of alerts to the dashboard:
-  1. "Rule"  : Suricata signature alerts (event_type == "alert")
-  2. "ML"    : Isolation Forest anomalies on completed flows (event_type == "flow")
-  3. "Stats" : per-source-IP port-scan / connection-flood detection (event_type == "flow")
+Tails Suricata's eve.json, runs every event through the detector (Rule + Stats + ML,
+see detection.py) and pushes the alerts to the browser with Socket.IO.
+
+Examples:
+    python dashboard/app.py                                  # live Suricata log (default path)
+    python dashboard/app.py --eve demo/eve_demo.json         # demo mode (see scripts/replay_demo.py)
+    python dashboard/app.py --own-ip 192.168.50.190          # hide alerts caused by this PC itself
+
+The PC's own LAN IP is detected automatically when --own-ip is not given. Everything
+(own IP, trusted IPs, thresholds) can also be changed live in the dashboard's Settings panel.
 """
 
 import eventlet
 eventlet.monkey_patch()
 
+import argparse
 import json
 import os
-import time
-import pandas as pd
-import joblib
+from pathlib import Path
+
 from flask import Flask, render_template
 from flask_socketio import SocketIO
-from stats_detector import ScanFloodDetector
 
-MODEL_PATH = "../model/ids_model.joblib"
-SCALER_PATH = "../model/ids_scaler.joblib"
-EVE_JSON_PATH = r"C:\Program Files\Suricata\log\eve.json"
-MIN_PKTS = 15            # must match the filter in read_suricata_flows.py (training)
-DEDUP_SECONDS = 5        # same src/dest/signature within this window = one alert
+import ids_settings as S
+import settings_api
+from detection import Detector
 
-# Statistical detector thresholds (tune these during testing)
-STATS_WINDOW_SEC = 10     # look-back window per source IP
-SCAN_PORTS = 15           # distinct ports on ONE host inside the window -> port scan
-FLOOD_FLOWS = 150         # connections from one source inside the window -> flood
-STATS_COOLDOWN_SEC = 30   # do not repeat the same alert for the same source sooner than this
-
-# IPs of the machine running Suricata + this dashboard. Its own outgoing traffic
-# (browsing, updates) is not an attack on itself, so Rule/Stats alerts from these
-# source IPs are skipped. Add your own LAN IP here.
-OWN_IPS = {"192.168.50.190"}
-
-SEVERITY_LABEL = {1: "High", 2: "Medium", 3: "Low"}
-
-print("[*] Loading AI Model and Scaler...")
-model = joblib.load(MODEL_PATH)
-scaler = joblib.load(SCALER_PATH)
+ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_EVE = r"C:\Program Files\Suricata\log\eve.json" if os.name == "nt" else "/var/log/suricata/eve.json"
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
-
-_recent_rule_alerts = {}   # (src, dest, signature_id) -> last time emitted
-stats_detector = ScanFloodDetector(
-    window=STATS_WINDOW_SEC, scan_ports=SCAN_PORTS,
-    flood_flows=FLOOD_FLOWS, cooldown=STATS_COOLDOWN_SEC)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+detector = None   # created in main()
 
 
-def calculate_features(flow):
-    start_ts = pd.to_datetime(flow.get("start"), errors="coerce")
-    end_ts = pd.to_datetime(flow.get("end"), errors="coerce")
+def tail_and_detect(eve_path):
+    announced = False
+    while not os.path.exists(eve_path):
+        if not announced:
+            print(f"[*] Waiting for {eve_path} to appear ...")
+            announced = True
+        socketio.sleep(1)
 
-    if pd.notnull(start_ts) and pd.notnull(end_ts):
-        duration_sec = (end_ts - start_ts).total_seconds()
-    else:
-        duration_sec = 0.0
-
-    pkts_toserver = flow.get("pkts_toserver", 0)
-    pkts_toclient = flow.get("pkts_toclient", 0)
-    bytes_toserver = flow.get("bytes_toserver", 0)
-    bytes_toclient = flow.get("bytes_toclient", 0)
-
-    total_pkts = pkts_toserver + pkts_toclient
-    total_bytes = bytes_toserver + bytes_toclient
-    bytes_per_pkt = total_bytes / (total_pkts if total_pkts > 0 else 1)
-
-    return pd.DataFrame([[
-        pkts_toserver, pkts_toclient, bytes_toserver, bytes_toclient,
-        duration_sec, total_pkts, total_bytes, bytes_per_pkt
-    ]], columns=[
-        "pkts_toserver", "pkts_toclient", "bytes_toserver", "bytes_toclient",
-        "duration_seconds", "total_pkts", "total_bytes", "bytes_per_pkt"
-    ])
-
-
-def handle_rule_alert(event):
-    """Suricata signature alert -> dashboard payload (with simple de-duplication)."""
-    if event.get("src_ip") in OWN_IPS:
-        return
-    alert = event.get("alert", {})
-    key = (event.get("src_ip"), event.get("dest_ip"), alert.get("signature_id"))
-    now = time.time()
-
-    last = _recent_rule_alerts.get(key)
-    if last is not None and now - last < DEDUP_SECONDS:
-        return
-    _recent_rule_alerts[key] = now
-
-    # keep the cache small
-    if len(_recent_rule_alerts) > 5000:
-        cutoff = now - DEDUP_SECONDS
-        for k in [k for k, t in _recent_rule_alerts.items() if t < cutoff]:
-            del _recent_rule_alerts[k]
-
-    payload = {
-        "timestamp": event.get("timestamp"),
-        "src_ip": event.get("src_ip"),
-        "dest_ip": event.get("dest_ip"),
-        "proto": event.get("proto", "Unknown"),
-        "source": "Rule",
-        "detail": alert.get("signature", "Suricata rule alert"),
-        "severity": SEVERITY_LABEL.get(alert.get("severity"), "-"),
-        "score": None,
-    }
-    print(f"[RULE ] {payload['src_ip']} -> {payload['dest_ip']} | {payload['detail']}")
-    socketio.emit('new_alert', payload)
-
-
-def handle_stats(event):
-    """Every flow (including tiny ones) -> per-source-IP scan/flood detector."""
-    if event.get("src_ip") in OWN_IPS:
-        return
-    for a in stats_detector.add(event.get("src_ip"), event.get("dest_ip"), event.get("dest_port")):
-        payload = {
-            "timestamp": event.get("timestamp"),
-            "src_ip": event.get("src_ip"),
-            "dest_ip": event.get("dest_ip"),
-            "proto": event.get("proto", "Unknown"),
-            "source": "Stats",
-            "detail": a["detail"],
-            "severity": a["severity"],
-            "score": None,
-        }
-        print(f"[STATS] {payload['src_ip']} -> {payload['dest_ip']} | {payload['detail']}")
-        socketio.emit('new_alert', payload)
-
-
-def handle_flow(event):
-    """Completed flow -> Isolation Forest -> dashboard payload if anomalous."""
-    flow_data = event.get("flow", {})
-    if flow_data.get("pkts_toserver", 0) + flow_data.get("pkts_toclient", 0) < MIN_PKTS:
-        return
-
-    features_df = calculate_features(flow_data)
-    features_scaled = scaler.transform(features_df)
-    prediction = model.predict(features_scaled)[0]
-
-    if prediction == -1:
-        anomaly_score = float(model.decision_function(features_scaled)[0])
-        payload = {
-            "timestamp": event.get("timestamp"),
-            "src_ip": event.get("src_ip"),
-            "dest_ip": event.get("dest_ip"),
-            "proto": event.get("proto", "Unknown"),
-            "source": "ML",
-            "detail": "Isolation Forest: abnormal flow volume/size",
-            "severity": "-",
-            "score": round(anomaly_score, 4),
-        }
-        print(f"[ML   ] {payload['src_ip']} -> {payload['dest_ip']} (Score: {payload['score']})")
-        socketio.emit('new_alert', payload)
-
-
-def tail_and_detect():
-    if not os.path.exists(EVE_JSON_PATH):
-        print(f"[!] Error: Cannot find {EVE_JSON_PATH}")
-        return
-
-    with open(EVE_JSON_PATH, "r", encoding="utf-8") as f:
-        f.seek(0, os.SEEK_END)
-        print("[*] Background detection engine started (rules + ML + stats). Monitoring traffic...")
+    with open(eve_path, "r", encoding="utf-8", errors="replace") as f:
+        f.seek(0, os.SEEK_END)          # only look at NEW events
+        print(f"[*] Detection engine running. Watching {eve_path}")
 
         while True:
+            pos = f.tell()
             line = f.readline()
+
             if not line:
+                try:                     # file was emptied or rotated -> start from the top
+                    if os.path.getsize(eve_path) < pos:
+                        f.seek(0)
+                except OSError:
+                    pass
                 socketio.sleep(0.1)
                 continue
 
+            if not line.endswith("\n"):  # half-written line: wait and read it again
+                f.seek(pos)
+                socketio.sleep(0.05)
+                continue
+
             try:
-                event = json.loads(line.strip())
-                event_type = event.get("event_type")
-                if event_type == "alert":
-                    handle_rule_alert(event)
-                elif event_type == "flow":
-                    handle_stats(event)   # must run BEFORE the MIN_PKTS filter: scans are tiny flows
-                    handle_flow(event)
-
+                event = json.loads(line)
             except json.JSONDecodeError:
-                pass
+                continue
+
+            try:
+                for alert in detector.process(event):
+                    print(f"[{alert['source']:5}] {alert['src_ip']} -> {alert['dest_ip']} | {alert['detail']}")
+                    socketio.emit("new_alert", alert)
             except Exception as e:
-                print(f"[!] Detection Engine Error: {e}")
+                print(f"[!] Detection engine error: {e}")
+
+            if detector.ml_error and not detector.ml_enabled and not getattr(detector, "_ml_warned", False):
+                detector._ml_warned = True
+                print(f"[!] ML layer switched off: {detector.ml_error}")
 
 
-@app.route('/')
+def watch_network(settings_path):
+    """Automatic mode: when the PC joins another network, follow its new IP."""
+    while True:
+        socketio.sleep(5)
+        try:
+            ip = S.detect_lan_ip()
+            if detector.refresh_own_ip(ip):
+                print(f"[*] Network changed. This PC is now {ip}")
+                try:
+                    S.save(settings_path, detector.get_settings())
+                except OSError:
+                    pass
+        except Exception as e:
+            print(f"[!] Network check error: {e}")
+
+
+@app.route("/")
 def index():
-    return render_template('dashboard.html')
+    return render_template("dashboard.html")
 
 
-if __name__ == '__main__':
-    socketio.start_background_task(tail_and_detect)
-    print("[*] Starting Campus IDS Dashboard on http://127.0.0.1:5000")
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+def main():
+    global detector
+    D = S.DEFAULTS
+    p = argparse.ArgumentParser(description="Campus IDS real-time dashboard")
+    p.add_argument("--eve", default=DEFAULT_EVE, help=f"Path to Suricata eve.json (default: {DEFAULT_EVE})")
+    p.add_argument("--model", default=str(ROOT / "model" / "ids_model.joblib"), help="Isolation Forest model file")
+    p.add_argument("--scaler", default=str(ROOT / "model" / "ids_scaler.joblib"), help="Scaler file")
+    p.add_argument("--settings-file", default=str(ROOT / "data" / "settings.json"),
+                   help="Where the Settings panel saves its values (default: data/settings.json)")
+    p.add_argument("--own-ip", action="append", default=None, metavar="IP",
+                   help="LAN IP of the monitored PC; Rule and Stats alerts from it are skipped "
+                        "(can be repeated; default: detected automatically)")
+    p.add_argument("--scan-ports", type=int, default=None, help=f"Different ports on one host that count as a port scan (default {D['scan_ports']})")
+    p.add_argument("--flood-flows", type=int, default=None, help=f"Connections from one source that count as a flood (default {D['flood_flows']})")
+    p.add_argument("--window", type=int, default=None, help=f"Look-back window in seconds for the Stats layer (default {D['window']})")
+    p.add_argument("--cooldown", type=int, default=None, help=f"Seconds before the same Stats alert repeats (default {D['cooldown']})")
+    p.add_argument("--host", default="127.0.0.1", help="Use 0.0.0.0 to open the dashboard from other devices (they can view, not change settings)")
+    p.add_argument("--port", type=int, default=5000)
+    args = p.parse_args()
+
+    # defaults < settings file < command line
+    cli = {}
+    if args.own_ip is not None:
+        cli["own_ips"] = args.own_ip
+    for key in ("scan_ports", "flood_flows", "window", "cooldown"):
+        if getattr(args, key) is not None:
+            cli[key] = getattr(args, key)
+    settings, errors, auto_ip = S.startup_settings(S.load(args.settings_file), cli, S.detect_lan_ip())
+    if errors:
+        p.error("; ".join(errors))
+
+    detector = Detector(model_path=args.model, scaler_path=args.scaler, **settings)
+    settings_api.register(app, lambda: detector, args.settings_file)
+
+    ignored = detector.own.to_list() + detector.trusted.to_list()
+    if auto_ip:
+        print(f"[*] This PC's LAN IP was detected automatically: {auto_ip} (it follows network changes)")
+    if ignored:
+        print("[*] Ignoring Rule/Stats alerts from: " + ", ".join(ignored))
+    else:
+        print("[*] Not ignoring any source. Alerts from this PC will be shown (see the Settings panel).")
+
+    print("[*] Layers: Rule = on, Stats = on, ML = " +
+          ("on" if detector.ml_enabled else f"OFF ({detector.ml_error})"))
+    if not detector.ml_enabled:
+        print("    To fix: pip install -r requirements.txt  (the model needs the pinned scikit-learn),")
+        print("    or retrain: python model/train_model.py --input data/baseline_features.csv "
+              "--model_out model/ids_model.joblib --scaler_out model/ids_scaler.joblib")
+
+    socketio.start_background_task(tail_and_detect, args.eve)
+    socketio.start_background_task(watch_network, args.settings_file)
+    print(f"[*] Dashboard: http://{'127.0.0.1' if args.host == '0.0.0.0' else args.host}:{args.port}")
+    socketio.run(app, host=args.host, port=args.port, debug=False, use_reloader=False)
+
+
+if __name__ == "__main__":
+    main()
