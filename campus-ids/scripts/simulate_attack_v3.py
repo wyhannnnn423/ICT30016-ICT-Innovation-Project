@@ -1,30 +1,58 @@
 """
 simulate_attack_v3.py
-Sends a few BIG TCP flows (about 8 MB each) so the model sees them as anomalies.
-Run this from ANOTHER device (laptop/phone with Python) on the same Wi-Fi,
-NOT from the same PC that runs Suricata.
+Sends large TCP flows to the target so the ML layer can flag them.
+Run it from the Kali VM (or another device), NOT from the target PC itself.
+
+Usage:
+    python3 simulate_attack_v3.py <target_ip> [port]
+Example:
+    python3 simulate_attack_v3.py 10.95.197.181 5000
 """
 import socket
+import sys
 import time
 
-TARGET_IP = "192.168.50.190"   # <-- the LAN IP of the PC running the dashboard (check with ipconfig)
-TARGET_PORT = 5000             # dashboard port (must be reachable)
-FLOWS = 5
-MB_PER_FLOW = 8
+TARGET_IP = sys.argv[1] if len(sys.argv) > 1 else "192.168.50.190"
+TARGET_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 5000
+FLOWS = 15
+CHUNK = b"MASSIVE_TCP_ANOMALY_DATA" * 2500   # about 60 KB per send
+CHUNKS_PER_FLOW = 20                         # about 1.2 MB per flow
 
-chunk = b"X" * 65536
-chunks_needed = (MB_PER_FLOW * 1024 * 1024) // len(chunk)
 
-for i in range(FLOWS):
+def send_flow():
+    """Send one big TCP flow. Returns the number of bytes sent."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(5.0)
+    sock.settimeout(2.0)
+    sent = 0
     try:
         sock.connect((TARGET_IP, TARGET_PORT))
-        for _ in range(chunks_needed):
-            sock.sendall(chunk)
-        print(f"[+] Flow {i+1}: sent {MB_PER_FLOW} MB")
-    except Exception as e:
-        print(f"[!] Flow {i+1} FAILED: {e}")   # if you see this, the traffic never reached the PC
+        for _ in range(CHUNKS_PER_FLOW):
+            sock.sendall(CHUNK)
+            sent += len(CHUNK)
     finally:
-        sock.close()
-    time.sleep(1)
+        sock.close()  # FIN lets Suricata close the flow
+    return sent
+
+
+def main():
+    print(f"[*] Target: {TARGET_IP}:{TARGET_PORT}")
+    ok = 0
+    for i in range(FLOWS):
+        try:
+            sent = send_flow()
+            ok += 1
+            print(f"[+] Flow #{i + 1}: sent {sent} bytes")
+        except Exception as e:
+            print(f"[-] Flow #{i + 1} FAILED: {e}")
+        time.sleep(1.5)
+
+    print(f"\n[*] {ok}/{FLOWS} flows sent.")
+    if ok == 0:
+        print("[!] Nothing reached the target. Check:")
+        print("    1. Is the target IP the PC's CURRENT IP? (see the dashboard)")
+        print("    2. Are the attacker and the target on the same network?")
+        print("    3. Is the dashboard listening on 0.0.0.0 and is port 5000 allowed in Windows Firewall?")
+
+
+if __name__ == "__main__":
+    main()
