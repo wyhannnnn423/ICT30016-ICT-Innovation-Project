@@ -24,18 +24,18 @@ Main dashboard features:
 
 ![Campus IDS Settings Panel](assets/settings.jpg)
 
-The Settings panel changes behaviour immediately and saves the values to `data/settings.json`.
+The Settings panel is built for user-friendly, low-friction operation. It automatically detects the PC's IP address and follows network changes, so users do not need to type IP addresses manually. Alerts from the PC itself are hidden, because its own browsing is not an attack.
 
-Settings panel features:
-- **This PC's IP address:** alerts from this address are hidden, because the PC's own browsing is not an attack. *Detect automatically* follows network changes. Uncheck it to enter an address manually.
-- **Trusted IPs or ranges:** hide alerts from other known devices, such as the router, your phone, or a lab server. Ranges like `192.168.50.0/28` are supported.
+Key features shown here:
+- **This PC's IP address:** detected automatically by default. Uncheck *Detect automatically* to enter an address manually.
+- **Trusted IPs or ranges:** hide alerts from known devices such as the router, a phone, or a lab server. Ranges like `192.168.50.0/28` are supported.
 - **Port scan: different ports:** number of different ports on one host within the time window that counts as a port scan.
 - **Flood: connections:** number of connections from one source within the time window that counts as a flood.
-- **Time window (seconds):** how far back the Stats detector looks.
-- **Cooldown (seconds):** how long to wait before the same source raises the same Stats alert again.
-- **Attack commands for the Kali VM:** ready-to-copy `ping`, `nmap`, and `hping3` commands with the current target IP filled in. Run them from a second device, never from the PC that runs Suricata.
-- **Save / Reset to defaults:** apply the new values or restore the default settings.
+- **Time window and Cooldown:** control how far back the Stats detector looks and how often the same source can raise the same alert again.
+- **Attack commands for the Kali VM:** ready-to-copy `ping`, `nmap`, and `hping3` commands with the target IP already filled in.
+- **Save / Reset to defaults:** apply changes immediately or restore the default values.
 
+All settings apply to new traffic immediately and are saved to `data/settings.json`.
 ## Team Members
 
 - **Jane Yan Zhen YU** (Team Leader)
