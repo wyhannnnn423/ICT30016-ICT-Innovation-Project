@@ -3,6 +3,7 @@
 A lightweight Intrusion Detection System (IDS) for campus networks. It reads network traffic from Suricata and shows alerts on a real-time web dashboard. Alerts come from three detection layers that work side by side.
 
 The dashboard is the main contribution of the project. It brings the three layers together on one screen, draws live charts, and looks after its own set-up: it finds the PC's IP address by itself, follows the PC when it joins another network, and warns when Suricata is listening on the wrong one.
+![Campus IDS Real-Time Alerts Dashboard](assets/screencapture-127-0-0-1-5000-2026-10-14-20_53_38.jpg)
 
 ## 👥 Team Members
 - **Jane Yan Zhen YU** (Team Leader)
