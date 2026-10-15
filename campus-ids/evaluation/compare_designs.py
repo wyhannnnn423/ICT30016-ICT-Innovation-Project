@@ -28,6 +28,7 @@ Outputs:
 import argparse
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -80,20 +81,82 @@ def window_start(value, width):
     return None if pd.isnull(t) else t.floor(width)
 
 
-def replay_design1(eve_files, args):
-    """Run the real dashboard detector over eve.json files. Returns {layer: set((src_ip, window))}."""
+def fast_epoch(text):
+    """ISO timestamp -> UTC epoch seconds. Much faster than pd.to_datetime for millions of lines."""
+    try:
+        return datetime.fromisoformat(text).timestamp()
+    except (TypeError, ValueError):
+        t = pd.to_datetime(text, errors="coerce", utc=True)
+        return None if pd.isnull(t) else t.timestamp()
+
+
+ML_COLUMNS = ["pkts_toserver", "pkts_toclient", "bytes_toserver", "bytes_toclient",
+              "duration_seconds", "total_pkts", "total_bytes", "bytes_per_pkt"]   # same as Detector._features
+
+
+def ml_row(flow):
+    pts, ptc = flow.get("pkts_toserver", 0), flow.get("pkts_toclient", 0)
+    bts, btc = flow.get("bytes_toserver", 0), flow.get("bytes_toclient", 0)
+    start, end = fast_epoch(flow.get("start")), fast_epoch(flow.get("end"))
+    duration = end - start if start is not None and end is not None else 0.0
+    total_pkts, total_bytes = pts + ptc, bts + btc
+    return [pts, ptc, bts, btc, duration, total_pkts, total_bytes, total_bytes / (total_pkts if total_pkts > 0 else 1)]
+
+
+def score_ml_batch(ml, rows, keys, hits, width):
+    """Isolation Forest on many flows at once (one flow at a time is ~100 times slower)."""
+    if not rows:
+        return
+    x = ml.scaler.transform(pd.DataFrame(rows, columns=ML_COLUMNS))
+    flagged = ml.model.predict(x) == -1
+    for key, bad in zip(keys, flagged):
+        if bad:
+            hits["ML"].add((key[0], pd.Timestamp(key[1], unit="s", tz="UTC")))
+
+
+def replay_design1(eve_files, args, first, last):
+    """Run Design 1 over eve.json files. Returns {layer: set((src_ip, window))}.
+
+    Rule and Stats go through the real dashboard detector (dashboard/detection.py), one event at a time.
+    The Isolation Forest uses the same model, scaler, packet filter and features, but scores flows in
+    batches, because scoring one flow at a time takes hours on a file this big.
+
+    Only the time range of the labelled windows (first .. last) is replayed. eve.json is huge and keeps
+    growing, and lines before or after that range cannot change the table. The files are read in order,
+    so reading stops as soon as the first line after the range appears."""
+    import time
     from detection import Detector
-    det = Detector(model_path=args.ml_model, scaler_path=args.scaler, own_ips=(), trusted_ips=(),
+    det = Detector(model_path=None, own_ips=(), trusted_ips=(),
                    scan_ports=args.scan_ports, flood_flows=args.flood_flows, window=args.stats_window,
                    cooldown=0, dedup_seconds=0)
-    if not det.ml_enabled:
-        print(f"[!] ML layer is off in the replay ({det.ml_error}); the ML row will be empty.")
+    ml = Detector(model_path=args.ml_model, scaler_path=args.scaler)
+    if not ml.ml_enabled:
+        print(f"[!] ML layer is off in the replay ({ml.ml_error}); the ML row will be empty.")
     width = f"{args.window}s"
+    # local-time strings, the same format as the start of every eve.json line (2026-10-13T14:21:15)
+    lo = first.tz_convert(args.tz).strftime("%Y-%m-%dT%H:%M:%S")
+    hi = (last + pd.Timedelta(seconds=args.window + 60)).tz_convert(args.tz).strftime("%Y-%m-%dT%H:%M:%S")
+    print(f"[*] Replaying only {lo} to {hi} ({args.tz})")
+
     hits = {"Rule": set(), "Stats": set(), "ML": set()}
-    n = 0
+    ml_rows, ml_keys = [], []
+    n_alert_events = 0
+    t0 = time.time()
     for path in eve_files:
+        lines = used = 0
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             for line in f:
+                lines += 1
+                if lines % 1_000_000 == 0:
+                    print(f"    {lines:,} lines read, {used:,} replayed, at {line[14:33]}, {time.time() - t0:.0f} s", flush=True)
+                if line.startswith('{"timestamp":"'):
+                    if '"event_type":"flow"' not in line and '"event_type":"alert"' not in line:
+                        continue
+                    ts = line[14:33]
+                    if ts < lo:
+                        continue
+                    if ts > hi:
+                        break                      # the file is in time order: nothing useful comes later
                 line = line.strip()
                 if not line:
                     continue
@@ -101,24 +164,39 @@ def replay_design1(eve_files, args):
                     ev = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if ev.get("event_type") not in ("flow", "alert"):
+                etype = ev.get("event_type")
+                if etype not in ("flow", "alert"):
                     continue
-                stamp = pd.to_datetime(ev.get("timestamp"), errors="coerce", utc=True)
-                if pd.isnull(stamp):
+                stamp = fast_epoch(ev.get("timestamp"))
+                if stamp is None:
                     continue
-                alerts = det.process(ev, now=stamp.timestamp())
-                if not alerts:
-                    continue
+                used += 1
                 # flow events are grouped by when the flow STARTED (as in aggregate.py); signature alerts by their time
-                when = (ev.get("flow") or {}).get("start") if ev["event_type"] == "flow" else ev.get("timestamp")
-                w = window_start(when or ev.get("timestamp"), width)
-                if w is None:
-                    continue
-                for a in alerts:
-                    hits[a["source"]].add((a["src_ip"], w))
-                n += 1
-        print(f"[*] Replayed {path}")
-    print(f"[*] {n} events raised at least one Design 1 alert")
+                flow = ev.get("flow") or {}
+                when = fast_epoch(flow.get("start")) if etype == "flow" else stamp
+                if when is None:
+                    when = stamp
+                bucket = (when // args.window) * args.window
+
+                if etype == "flow" and ml.ml_enabled and \
+                        flow.get("pkts_toserver", 0) + flow.get("pkts_toclient", 0) >= ml.min_pkts:
+                    ml_rows.append(ml_row(flow))
+                    ml_keys.append((ev.get("src_ip"), bucket))
+                    if len(ml_rows) >= 50_000:
+                        score_ml_batch(ml, ml_rows, ml_keys, hits, width)
+                        ml_rows, ml_keys = [], []
+
+                alerts = det.process(ev, now=stamp)
+                if alerts:
+                    n_alert_events += 1
+                    for a in alerts:
+                        hits[a["source"]].add((a["src_ip"], pd.Timestamp(bucket, unit="s", tz="UTC")))
+        print(f"[*] Replayed {path}: {lines:,} lines read, {used:,} used, {time.time() - t0:.0f} s")
+    score_ml_batch(ml, ml_rows, ml_keys, hits, width)
+    print(f"[*] Alerts: Rule in {len(hits['Rule'])} windows, Stats in {len(hits['Stats'])}, ML in {len(hits['ML'])}")
+    if len(hits["Rule"]) + len(hits["Stats"]) + len(hits["ML"]) < 50:
+        print("[!] Very few alerts. Does this eve.json really contain the attack days? "
+              "(Use the file(s) you gave to aggregate.py.)")
     return hits
 
 
@@ -202,7 +280,8 @@ def main():
             stats(args.extra_scan_ports, args.flood_flows), False)
 
     if args.eve:
-        hits = replay_design1(args.eve, args)
+        win = pd.to_datetime(d["window"], utc=True)
+        hits = replay_design1(args.eve, args, win.min(), win.max())
         key = list(zip(d["src_ip"], pd.to_datetime(d["window"], utc=True)))
         flag = {k: pd.Series([kk in hits[k] for kk in key], index=d.index).astype(int) for k in hits}
         add("Design 1 Rule layer (Suricata signatures)", flag["Rule"], False)
