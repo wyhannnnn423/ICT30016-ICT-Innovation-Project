@@ -61,6 +61,12 @@ python dashboard/app.py --rf
 - Add `--rf-debug` to see the probability of every 10-second window that has 2 or more flows. This is the easiest way to see why RF is quiet.
 - `--rf-model <path>` uses another model file.
 
+What it looks like: an `nmap -sS -p 1-1000` scan from Kali (192.168.50.204) against the PC running Suricata.
+The Rule alert comes first, then Stats and Random Forest (the RF time is the end of its 10-second window). The ML row at the top is
+a separate, unrelated alert for normal UDP traffic.
+
+![Dashboard during an nmap scan: Rule, Stats and Random Forest alerts](images/dashboard_rf_scan.png)
+
 Things to know:
 
 - An RF alert comes **about 15 seconds after the attack**: the 10-second window has to end, and the detector
@@ -104,31 +110,43 @@ Add `--ignore-ips 192.168.50.190` to `train_rf.py` to leave out your own PC when
 
 ## Results so far
 
-Same windows for both designs (20,575 windows, 60 attack windows: 40 port scan, 20 SYN flood).
-Random Forest is tested with leave-one-day-out cross-validation: every window is predicted by a model that never saw that day.
+Same windows for every method: 16,820 windows from the days with attacks (our own PC left out), of which 60 are
+attack windows (40 port scan, 20 SYN flood). Random Forest is tested with leave-one-day-out cross-validation: every
+window is predicted by a model that never saw that day. The Design 1 layers need no training on attacks; they were
+replayed from the real `eve.json` through `dashboard/detection.py`.
 
-| Method | Precision | Recall | False alarms |
-|---|---|---|---|
-| Random Forest | 0.92 | 0.75 | 4 (all from our own PC) |
-| Design 1 Stats, fixed limits (15 ports or 150 flows) | 0.49 | 0.80 | 51 (mostly our own PC) |
+| Method | Attacks found | False-alarm windows | Precision | Recall | F1 |
+|---|---|---|---|---|---|
+| Design 1 Isolation Forest layer | 0 of 60 | 291 | 0.00 | 0.00 | 0.00 |
+| Design 1 Suricata rule layer | 60 of 60 | 305 | 0.16 | 1.00 | 0.28 |
+| Design 1 Stats layer (15 ports / 150 flows) | 58 of 60 | 2 | 0.97 | 0.97 | 0.97 |
+| Design 1 all layers together | 60 of 60 | 585 | 0.09 | 1.00 | 0.17 |
+| **Design 2 Random Forest** | 45 of 60 | 0 | 1.00 | 0.75 | 0.86 |
 
-When our own PC is hidden, as the dashboard does: both have no false alarms and recall 0.75 (RF) vs 0.80 (Stats).
-So the prototype does **not** show that Design 2 detects more than the Stats layer. What it does show is that scans and
-floods can be learned from data, without hand-set limits. The Isolation Forest layer flagged none of our Kali attacks.
+What this means:
+
+- Design 2 is much better than the Isolation Forest layer, which found none of our Kali attacks.
+- Design 2 is **not** better than the Stats layer of Design 1: Stats found more attacks (58 vs 45) with almost as few false alarms.
+  The Random Forest adds no attack that the Design 1 layers did not already find.
+- The Random Forest has no false alarms, while the rule layer and the Isolation Forest raise many alerts on normal traffic.
+- So for now Design 2 is an optional extra layer that learns from data, not a replacement. Whether it helps on other attacks
+  (other tools, slower scans) still has to be tested.
+- Only 60 attack windows from a few runs, so treat small differences as noise. The Stats limits were chosen while looking at part of
+  these data, so none of the numbers is a final, independent test.
 
 Live tests from Kali against the Windows PC:
 
 - `nmap -sS -p 1-1000`: RF alert with 1591 flows, 934 ports, attack probability 1.0.
 - `hping3 -S -p 80 --flood`: RF alert with 20310 flows, but only probability 0.70, so the model is less sure about floods.
 
-Reproduce the Design 1 vs Design 2 table:
+Reproduce the table (takes a few minutes on a 5 GB `eve.json`):
 
 ```
 python evaluation/compare_designs.py --eve <eve.json files> --ignore-ips 192.168.50.190
 ```
 
-The Rule and ML rows only work when `--eve` points to the files that contain the attacks. With the wrong or a
-new `eve.json` they show 0 detections, which is not a real result.
+The Design 1 rows are only real when `--eve` points to the files that contain the attacks. The rows that apply the two limits
+to the fixed windows (without `--eve` they are the only Design 1 rows) over-count ports, so use the "live replay" row.
 
 ## Limits
 
