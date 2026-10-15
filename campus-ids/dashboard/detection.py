@@ -5,10 +5,12 @@ The detection logic of the Campus IDS, kept separate from Flask so it can be
 tested without a web server.
 
 Detector.process(event) takes ONE parsed line of Suricata's eve.json and returns
-a list of alert dicts (usually empty). Three layers:
+a list of alert dicts (usually empty). Three layers (plus an optional fourth):
   - "Rule"  : Suricata signature alerts (event_type == "alert")
   - "Stats" : per-source-IP port-scan / connection-flood counting (event_type == "flow")
   - "ML"    : Isolation Forest on completed flows (event_type == "flow")
+  - "RF"    : (Design 2, optional) Random Forest on per-source-IP 10-second windows,
+              switched on with rf_model_path / --rf (see rf_detector.py)
 
 If the ML model cannot be loaded (for example a scikit-learn version mismatch),
 the Rule and Stats layers still work.
@@ -20,6 +22,7 @@ import warnings
 import pandas as pd
 
 from ids_settings import IpMatcher
+from rf_detector import RFDetector
 from stats_detector import ScanFloodDetector
 
 SEVERITY_LABEL = {1: "High", 2: "Medium", 3: "Low"}
@@ -28,7 +31,7 @@ SEVERITY_LABEL = {1: "High", 2: "Medium", 3: "Low"}
 class Detector:
     def __init__(self, model_path=None, scaler_path=None, own_ips=(), trusted_ips=(), auto_own_ip=False,
                  min_pkts=15, scan_ports=15, flood_flows=150,
-                 window=10, cooldown=30, dedup_seconds=5):
+                 window=10, cooldown=30, dedup_seconds=5, rf_model_path=None):
         self.auto_own_ip = auto_own_ip         # True: own IP follows the detected network address
         self.started = time.time()
         self.last_event = None                 # when Suricata last delivered any event
@@ -44,6 +47,46 @@ class Detector:
         self.scaler = None
         self.ml_error = None
         self._load_model(model_path, scaler_path)
+        self.rf = None                    # Design 2 layer, only when rf_model_path is given
+        self.rf_error = None
+        self._load_rf(rf_model_path, cooldown)
+
+    # ---------- Design 2: Random Forest ----------
+    def _load_rf(self, rf_model_path, cooldown):
+        if not rf_model_path:
+            return
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                self.rf = RFDetector(rf_model_path, cooldown=cooldown)
+        except Exception as e:            # missing file, version mismatch, wrong file type ...
+            self.rf = None
+            self.rf_error = f"{type(e).__name__}: {e}"
+
+    @property
+    def rf_enabled(self):
+        return self.rf is not None
+
+    def _rf_alerts(self, event, now):
+        if not self.rf_enabled or self.is_ignored(event.get("src_ip")):
+            return []
+        try:
+            return self.rf.add(event, now)
+        except Exception as e:
+            self.rf = None                # do not repeat the same error for every flow
+            self.rf_error = f"{type(e).__name__}: {e}"
+            return []
+
+    def tick(self, now=None):
+        """Call about once a second: lets the RF layer close finished windows on a quiet network."""
+        if not self.rf_enabled:
+            return []
+        try:
+            return self.rf.tick(time.time() if now is None else now)
+        except Exception as e:
+            self.rf = None
+            self.rf_error = f"{type(e).__name__}: {e}"
+            return []
 
     # ---------- ML model ----------
     def _load_model(self, model_path, scaler_path):
@@ -211,5 +254,5 @@ class Detector:
             return self._rule_alert(event, now)
         if etype == "flow":
             # Stats first and on EVERY flow: scans are made of tiny flows that the ML filter would drop.
-            return self._stats_alert(event, now) + self._ml_alert(event)
+            return self._stats_alert(event, now) + self._ml_alert(event) + self._rf_alerts(event, now)
         return []

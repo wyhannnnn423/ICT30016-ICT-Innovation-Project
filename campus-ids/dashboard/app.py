@@ -10,17 +10,18 @@ Examples:
     python dashboard/app.py                                  # live Suricata log (default path)
     python dashboard/app.py --eve demo/eve_demo.json         # demo mode (see scripts/replay_demo.py)
     python dashboard/app.py --own-ip 192.168.50.190          # hide alerts caused by this PC itself
+    python dashboard/app.py --rf                             # also run the Design 2 Random Forest layer
 
 The PC's own LAN IP is detected automatically when --own-ip is not given. Everything
 (own IP, trusted IPs, thresholds) can also be changed live in the dashboard's Settings panel.
 """
 
-import eventlet
-eventlet.monkey_patch()
 
 import argparse
 import json
 import os
+import time
+import threading
 from pathlib import Path
 
 from flask import Flask, render_template
@@ -30,11 +31,13 @@ import ids_settings as S
 import settings_api
 from detection import Detector
 
+
+
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_EVE = r"C:\Program Files\Suricata\log\eve.json" if os.name == "nt" else "/var/log/suricata/eve.json"
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 detector = None   # created in main()
 
 
@@ -85,6 +88,18 @@ def tail_and_detect(eve_path):
                 print(f"[!] ML layer switched off: {detector.ml_error}")
 
 
+def rf_clock():
+    """Design 2: once a second, close finished 10-second windows (also when the network is quiet)."""
+    while True:
+        socketio.sleep(1)
+        try:
+            for alert in detector.tick():
+                print(f"[{alert['source']:5}] {alert['src_ip']} -> {alert['dest_ip']} | {alert['detail']}")
+                socketio.emit("new_alert", alert)
+        except Exception as e:
+            print(f"[!] RF clock error: {e}")
+
+
 def watch_network(settings_path):
     """Automatic mode: when the PC joins another network, follow its new IP."""
     while True:
@@ -113,6 +128,12 @@ def main():
     p.add_argument("--eve", default=DEFAULT_EVE, help=f"Path to Suricata eve.json (default: {DEFAULT_EVE})")
     p.add_argument("--model", default=str(ROOT / "model" / "ids_model.joblib"), help="Isolation Forest model file")
     p.add_argument("--scaler", default=str(ROOT / "model" / "ids_scaler.joblib"), help="Scaler file")
+    p.add_argument("--rf", action="store_true",
+                   help="Also run the Design 2 layer: Random Forest on per-source-IP 10-second windows (alerts labelled RF)")
+    p.add_argument("--rf-debug", action="store_true",
+                   help="With --rf: print the attack probability of every 10-second window that has 2+ flows (to see why RF is quiet)")
+    p.add_argument("--rf-model", default=str(ROOT / "model" / "rf_model.joblib"),
+                   help="Random Forest file made by design2/train_rf.py (used with --rf)")
     p.add_argument("--settings-file", default=str(ROOT / "data" / "settings.json"),
                    help="Where the Settings panel saves its values (default: data/settings.json)")
     p.add_argument("--own-ip", action="append", default=None, metavar="IP",
@@ -137,7 +158,8 @@ def main():
     if errors:
         p.error("; ".join(errors))
 
-    detector = Detector(model_path=args.model, scaler_path=args.scaler, **settings)
+    detector = Detector(model_path=args.model, scaler_path=args.scaler,
+                        rf_model_path=args.rf_model if args.rf else None, **settings)
     settings_api.register(app, lambda: detector, args.settings_file)
 
     ignored = detector.own.to_list() + detector.trusted.to_list()
@@ -149,7 +171,8 @@ def main():
         print("[*] Not ignoring any source. Alerts from this PC will be shown (see the Settings panel).")
 
     print("[*] Layers: Rule = on, Stats = on, ML = " +
-          ("on" if detector.ml_enabled else f"OFF ({detector.ml_error})"))
+          ("on" if detector.ml_enabled else f"OFF ({detector.ml_error})") +
+          (", RF = " + ("on" if detector.rf_enabled else f"OFF ({detector.rf_error})") if args.rf else ""))
     if not detector.ml_enabled:
         print("    To fix: pip install -r requirements.txt  (the model needs the pinned scikit-learn),")
         print("    or retrain: python model/train_model.py --input data/baseline_features.csv "
@@ -157,6 +180,9 @@ def main():
 
     socketio.start_background_task(tail_and_detect, args.eve)
     socketio.start_background_task(watch_network, args.settings_file)
+    if detector.rf_enabled:
+        detector.rf.debug = args.rf_debug
+        socketio.start_background_task(rf_clock)
     print(f"[*] Dashboard: http://{'127.0.0.1' if args.host == '0.0.0.0' else args.host}:{args.port}")
     socketio.run(app, host=args.host, port=args.port, debug=False, use_reloader=False)
 

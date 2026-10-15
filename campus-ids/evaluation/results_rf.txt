@@ -1,0 +1,79 @@
+Loaded 27975 windows: benign=27915, portscan=40, synflood=20
+Windows per day (attack/total): 2026-09-25=0/339, 2026-09-26=0/5866, 2026-09-29=0/473, 2026-10-03=20/6846, 2026-10-04=7/325, 2026-10-08=11/4931, 2026-10-09=0/722, 2026-10-13=22/8473
+Features: ['conn_count', 'distinct_ports', 'rst_ratio', 'avg_pkts', 'total_bytes']
+
+Fold: test day 2026-10-03 (trained on the other days)
+  windows: 6846  (attack 20, benign 6826)
+  TP=18  FN=2  FP=3  TN=6823
+  precision=0.857  recall=0.900  F1=0.878  false-positive rate=0.0004
+  recall portscan: 12/14
+  recall synflood: 6/6
+
+Fold: test day 2026-10-04 (trained on the other days)
+  windows: 325  (attack 7, benign 318)
+  TP=7  FN=0  FP=0  TN=318
+  precision=1.000  recall=1.000  F1=1.000  false-positive rate=0.0000
+  recall portscan: 6/6
+  recall synflood: 1/1
+
+Fold: test day 2026-10-08 (trained on the other days)
+  windows: 4931  (attack 11, benign 4920)
+  TP=10  FN=1  FP=1  TN=4919
+  precision=0.909  recall=0.909  F1=0.909  false-positive rate=0.0002
+  recall portscan: 4/4
+  recall synflood: 6/7
+
+Fold: test day 2026-10-13 (trained on the other days)
+  windows: 8473  (attack 22, benign 8451)
+  TP=10  FN=12  FP=0  TN=8451
+  precision=1.000  recall=0.455  F1=0.625  false-positive rate=0.0000
+  recall portscan: 5/16
+  recall synflood: 5/6
+
+ALL FOLDS POOLED
+  windows: 20575  (attack 60, benign 20515)
+  TP=45  FN=15  FP=4  TN=20511
+  precision=0.918  recall=0.750  F1=0.826  false-positive rate=0.0002
+  recall portscan: 27/40
+  recall synflood: 18/20
+
+False positives (benign windows predicted as attack), up to 10:
+               src_ip                    window   label  conn_count  distinct_ports  rst_ratio  avg_pkts  total_bytes
+10290  192.168.50.190 2026-10-03 06:59:50+00:00  benign          34              34   0.878788  2.323529         6880
+10292  192.168.50.190 2026-10-03 07:00:10+00:00  benign          54              52   0.944444  2.333333        13385
+10518  192.168.50.190 2026-10-03 07:53:00+00:00  benign          56              55   0.943396  2.428571        16953
+12259  192.168.50.190 2026-10-08 09:05:20+00:00  benign         111               4   0.800000  2.738739        54389
+
+Missed attacks (attack windows predicted as benign):
+               src_ip                    window     label  conn_count  distinct_ports  rst_ratio  avg_pkts  total_bytes
+14877  192.168.50.204 2026-10-08 06:25:30+00:00  synflood          44               1   1.000000  6.000000        15664
+14887  192.168.50.204 2026-10-13 06:21:10+00:00  portscan          40              20   0.000000  2.000000         4800
+14891  192.168.50.204 2026-10-13 06:24:00+00:00  portscan          73              45   0.013699  2.054795         8996
+14894  192.168.50.204 2026-10-13 06:25:10+00:00  portscan          24              13   0.166667  2.666667         3824
+14895  192.168.50.204 2026-10-13 06:25:20+00:00  portscan          25              13   0.080000  2.320000         3472
+14896  192.168.50.204 2026-10-13 06:25:30+00:00  portscan          25              13   0.080000  2.320000         3472
+14897  192.168.50.204 2026-10-13 06:25:40+00:00  portscan          25              13   0.120000  2.480000         3708
+14898  192.168.50.204 2026-10-13 06:25:50+00:00  portscan          25              13   0.080000  2.320000         3472
+14899  192.168.50.204 2026-10-13 06:26:00+00:00  portscan          24              12   0.083333  2.333333         3352
+14900  192.168.50.204 2026-10-13 06:26:10+00:00  portscan          25              13   0.080000  2.320000         3472
+14901  192.168.50.204 2026-10-13 06:26:20+00:00  portscan          25              13   0.120000  2.480000         3708
+14902  192.168.50.204 2026-10-13 06:26:30+00:00  portscan          18              10   0.055556  2.222222         2396
+14907  192.168.50.204 2026-10-13 06:28:00+00:00  synflood          49               1   1.000000  6.000000        17444
+16198   192.168.50.72 2026-10-03 08:25:30+00:00  portscan         140             130   0.000000  1.942857        26039
+16202   192.168.50.72 2026-10-03 08:37:00+00:00  portscan         132             131   0.000000  2.969697        30019
+
+REFERENCE: fixed rule (distinct_ports >= 15 or conn_count >= 150) on the same windows
+  windows: 20575  (attack 60, benign 20515)
+  TP=48  FN=12  FP=51  TN=20464
+  precision=0.485  recall=0.800  F1=0.604  false-positive rate=0.0025
+  recall portscan: 31/40
+  recall synflood: 17/20
+
+Feature importance of the final model (trained on all days):
+  conn_count      0.455
+  rst_ratio       0.303
+  distinct_ports  0.119
+  total_bytes     0.071
+  avg_pkts        0.051
+
+[Done] Final model saved to model/rf_model.joblib
