@@ -4,13 +4,14 @@
 
 | Method | Labels needed | TP | FN | FP | Precision | Recall | F1 | Recall portscan | Recall synflood |
 |---|---|---|---|---|---|---|---|---|---|
+| Design 1 Stats, fixed limits (15 ports / 150 flows) | no | 48 | 12 | 0 | 1.00 | 0.80 | 0.89 | 31/40 | 17/20 |
 | Design 1 Stats, fixed limits (5 ports / 150 flows) | no | 57 | 3 | 25 | 0.70 | 0.95 | 0.80 | 40/40 | 17/20 |
-| Design 1 Rule layer (Suricata signatures) | no | 0 | 60 | 0 | - | 0.00 | 0.00 | 0/40 | 0/20 |
-| Design 1 Stats layer, live replay (5 ports / 150 flows) | no | 0 | 60 | 0 | - | 0.00 | 0.00 | 0/40 | 0/20 |
-| Design 1 ML layer (Isolation Forest) | no | 0 | 60 | 0 | - | 0.00 | 0.00 | 0/40 | 0/20 |
-| Design 1 hybrid (Rule or Stats or ML) | no | 0 | 60 | 0 | - | 0.00 | 0.00 | 0/40 | 0/20 |
+| Design 1 Rule layer (Suricata signatures) | no | 60 | 0 | 305 | 0.16 | 1.00 | 0.28 | 40/40 | 20/20 |
+| Design 1 Stats layer, live replay (15 ports / 150 flows) | no | 58 | 2 | 2 | 0.97 | 0.97 | 0.97 | 39/40 | 19/20 |
+| Design 1 ML layer (Isolation Forest) | no | 0 | 60 | 291 | 0.00 | 0.00 | 0.00 | 0/40 | 0/20 |
+| Design 1 hybrid (Rule or Stats or ML) | no | 60 | 0 | 585 | 0.09 | 1.00 | 0.17 | 40/40 | 20/20 |
 | Design 2 Random Forest | yes | 45 | 15 | 0 | 1.00 | 0.75 | 0.86 | 27/40 | 18/20 |
-| Design 1 + Design 2 together | yes | 45 | 15 | 0 | 1.00 | 0.75 | 0.86 | 27/40 | 18/20 |
+| Design 1 + Design 2 together | yes | 60 | 0 | 585 | 0.09 | 1.00 | 0.17 | 40/40 | 20/20 |
 
 How to read it:
 - Design 2 (Random Forest, features conn_count, distinct_ports, rst_ratio, avg_pkts, total_bytes) is tested with leave-one-day-out cross-validation: every window is predicted by a model that never saw that day.
