@@ -1,5 +1,7 @@
 # Design 2: Random Forest on 10-second IP windows
 
+![Dashboard during an nmap scan: Rule, Stats and Random Forest alerts](images/dashboard_rf_scan.png)
+
 Design 1 looks at one network flow at a time. A port scan or a SYN flood is made of many tiny flows, so
 it is hard to see that way. Design 2 looks at **one source IP over 10 seconds** and a Random Forest
 decides "attack or normal". It is an optional extra layer on top of Design 1: without `--rf` the dashboard
@@ -65,7 +67,6 @@ What it looks like: an `nmap -sS -p 1-1000` scan from Kali (192.168.50.204) agai
 The Rule alert comes first, then Stats and Random Forest (the RF time is the end of its 10-second window). The ML row at the top is
 a separate, unrelated alert for normal UDP traffic.
 
-![Dashboard during an nmap scan: Rule, Stats and Random Forest alerts](images/dashboard_rf_scan.png)
 
 Things to know:
 
