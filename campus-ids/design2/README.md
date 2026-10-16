@@ -122,6 +122,7 @@ no training on attacks; they were replayed from the real `eve.json` through `das
 | Design 1 Stats layer | 90 of 96 | 6 | 0.94 | 0.94 | 0.94 |
 | Design 1 all layers together | 95 of 96 | 601 | 0.14 | 0.99 | 0.24 |
 | **Design 2 Random Forest** | 86 of 96 | 1 | 0.99 | 0.90 | 0.94 |
+| **Design 1 Stats layer + Design 2 together** (an alert from either) | 95 of 96 | 6 | 0.94 | 0.99 | 0.96 |
 
 What this means:
 
@@ -130,8 +131,11 @@ What this means:
   - The Stats layer missed all 3 windows of the slowest SYN flood (10 packets per second); the Random Forest found 2 of them.
   - The Random Forest missed the full-speed `hping3 --flood` runs (0 of 5 windows) and the UDP flood and UDP scan (0 of 1 each);
     the Stats layer found all of them.
+- **Used together, Stats and the Random Forest found 95 of 96 attack windows with the same 6 false-alarm windows as Stats alone.**
+  The only attack window still missed is one of the three 10-packets-per-second SYN flood windows.
 - The Random Forest has the fewest false alarms (1 window). The rule layer and the Isolation Forest raise hundreds on normal traffic.
-- So Design 2 looks more useful as a second layer next to Stats than as a replacement for it.
+- So Design 2 looks more useful as a second layer next to Stats than as a replacement for it. The false alarms of the
+  complete Design 1 come mostly from the Suricata rule layer (310 windows) and the Isolation Forest layer (298 windows), not from Stats.
 - Only 96 attack windows from a few runs (some attack kinds have 1 to 3 windows), so treat small differences as noise. The Stats limits
   were chosen while looking at part of these data, so none of the numbers is a final, independent test.
 - No ICMP flood window appears: an ICMP flood is only a handful of flows (no ports), so its windows have fewer than 5 flows and are left out.

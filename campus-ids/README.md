@@ -1,176 +1,213 @@
-# Design 2: Random Forest on 10-second IP windows
+# Campus IDS - ICT30016 (ICT Innovation Project)
 
-Design 1 looks at one network flow at a time. A port scan or a SYN flood is made of many tiny flows, so
-it is hard to see that way. Design 2 looks at **one source IP over 10 seconds** and a Random Forest
-decides "attack or normal". It is an optional extra layer on top of Design 1: without `--rf` the dashboard
-works exactly as before.
+A lightweight Intrusion Detection System (IDS) for campus networks. It reads network traffic from Suricata and shows real-time alerts on a web dashboard. Alerts come from three detection layers working together.
 
-> Status: early prototype. It was trained and tested only on our own lab attacks (Kali VM and one other
-> device, port scans and SYN floods), so the numbers below are a first indication, not a final test.
+## Dashboard
 
-## How it works
+The dashboard is the main contribution of this project. It combines the three detection layers on one screen, draws live charts, and manages its own setup: it detects the PC's IP address automatically, follows the PC when it joins another network, and warns when Suricata is listening on the wrong network.
 
-1. Suricata writes flow records to `eve.json`.
-2. Flows are grouped by source IP and by 10-second window (by when the flow started).
-3. For each (IP, window) we compute 5 features:
+![Campus IDS Real-Time Alerts Dashboard](assets/dashboard.jpg)
 
-| Feature | Meaning |
+Open **http://127.0.0.1:5000** after starting the app.
+
+Main dashboard features:
+- **Status bar:** shows the hidden IP addresses, the current scan/flood thresholds, and the capture banner. A green banner means Suricata is delivering traffic for this PC.
+- **Alerts in the last 10 minutes:** stacked bars in 30-second intervals. The legend shows how many alerts each layer raised.
+- **Legend as filter:** click **Rule alerts**, **Scans and floods**, or **ML anomalies** to show only that layer in the table. Click again to show all.
+- **Share by detection layer:** ring chart showing the proportion of Rule, Stats, and ML alerts.
+- **Busiest sources:** the top source addresses and how many alerts they raised.
+- **Alert table:** timestamp, layer, source IP, destination IP, protocol, detail, severity, and anomaly score.
+- **Export to CSV:** saves the rows currently shown in the table.
+- **Controls:** use the **Show** dropdown to filter, **Settings** to open the settings panel, and **Export to CSV** to download alerts.
+
+## Settings Panel
+
+![Campus IDS Settings Panel](assets/settings.jpg)
+
+The Settings panel is built for user-friendly, low-friction operation. It automatically detects the PC's IP address and follows network changes, so users do not need to type IP addresses manually. Alerts from the PC itself are hidden, because its own browsing is not an attack.
+
+Key features shown here:
+- **This PC's IP address:** detected automatically by default. Uncheck *Detect automatically* to enter an address manually.
+- **Trusted IPs or ranges:** hide alerts from known devices such as the router, a phone, or a lab server. Ranges like `192.168.50.0/28` are supported.
+- **Port scan: different ports:** number of different ports on one host within the time window that counts as a port scan.
+- **Flood: connections:** number of connections from one source within the time window that counts as a flood.
+- **Time window and Cooldown:** control how far back the Stats detector looks and how often the same source can raise the same alert again.
+- **Attack commands for the Kali VM:** ready-to-copy `ping`, `nmap`, and `hping3` commands with the target IP already filled in.
+- **Save / Reset to defaults:** apply changes immediately or restore the default values.
+
+All settings apply to new traffic immediately and are saved to `data/settings.json`.
+## Team Members
+
+- **Jane Yan Zhen YU** (Team Leader)
+- **Yan Han WONG**
+- **Neville Zi Yang**
+- **Bruce Gee Yick WONG**
+
+## Architecture
+
+```text
+Network traffic -> Suricata -> eve.json -> Flask app (dashboard/app.py) -> live dashboard
+                                              |- Rule layer   (Suricata signature alerts)
+                                              |- Stats layer  (port scan / connection flood per source IP)
+                                              '- ML layer     (Isolation Forest on flow features)
+```
+
+| Layer | Label | Detects | How |
+|---|---|---|---|
+| Rule | red **Rule** | Known patterns, e.g. ping, SYN bursts | Suricata rules in `suricata/rules/campus-ids.rules` |
+| Stats | blue **Stats** | Port scan (15+ ports within 10 s), connection flood (150+ connections within 10 s) | `dashboard/stats_detector.py`, no training needed |
+| ML | orange **ML** | Unusual flow size or volume | Isolation Forest trained on baseline traffic |
+
+## Design Evolution
+
+Version 1 used only an Isolation Forest. It had a low false-positive rate but detected **0% of DDoS and 0% of PortScan** in CIC-IDS2017 tests, because it looks at one flow at a time and misses many small, normal-looking flows.
+
+Version 2 is a hybrid system. The Isolation Forest is kept for unknown flow anomalies, while a Suricata rule layer and a sliding-window stats layer catch known patterns, port scans, and floods.
+
+## Results So Far
+
+CIC-IDS2017 cross-dataset test (ML layer only):
+
+| Test data | Result |
 |---|---|
-| `conn_count` | number of flows the IP started in the window |
-| `distinct_ports` | number of different destination ports it touched |
-| `rst_ratio` | share of TCP flows that ended with a reset |
-| `avg_pkts` | average packets per flow |
-| `total_bytes` | bytes sent and received in all those flows |
+| BENIGN flows flagged (false positives) | 0.7% |
+| DDoS detected | 0% |
+| PortScan detected | 0% |
 
-4. A Random Forest (scikit-learn, 200 trees, class-weighted) says attack or normal.
-   It is a two-class model: port scans and floods are both just "attack".
+Lab test with a Kali VM attacking the target PC (one run per attack, preliminary):
 
-`syn_ratio` was in our first plan but is no longer used: every flow of our hping3 flood has 6 packets
-(SYN, RST, ACK), so the SYN ratio stayed close to zero and the model ignored it.
+| Attack | Rule layer | Stats layer | ML layer |
+|---|---|---|---|
+| Ping | detected | - | not detected |
+| nmap SYN scan | detected | detected (Port scan) | not detected |
+| hping3 SYN flood | detected | detected (Connection flood) | not detected |
 
-## Files
+Stats alerts appeared about 5-8 seconds after the first Rule alert.
 
-| File | What it does |
-|---|---|
-| `aggregate.py` | Turns `eve.json` into one row per (source IP, 10 s window). With `--labels` it also labels the windows. Also holds `parse_flow_event`, which the live detector reuses, so training and live detection use the same numbers. |
-| `train_rf.py` | Trains the Random Forest and tests it with leave-one-day-out cross-validation. Saves `model/rf_model.joblib` and a report in `evaluation/results_rf.txt`. |
-| `labels.csv`, `labels_oct13.csv` | Our attack logs (start time, end time, attacker IP, label). |
-| `attack_logger.sh` | Runs on the Kali VM. Runs one attack and writes its label line for you. |
-| `peek_flows.py` | Prints a few raw flow records, to see what an attack really looks like. |
-| `cicids_check.py` | Tries the model on CIC-IDS2017 (needs the TrafficLabelling version of the files, see Limits). |
-| `../dashboard/rf_detector.py` | The live version, used by the dashboard. |
-| `../evaluation/compare_designs.py` | Design 1 vs Design 2 table on the same windows. |
-| `../tests/test_rf_detector.py` | Tests for the live detector. |
+**Known limitations**
+- The ML layer alone does not detect scans or floods.
+- The SYN-burst rule can fire on normal traffic from the monitored PC itself; its own address is hidden automatically.
+- Thresholds are starting values and are not tuned on a large dataset.
+- Alerts are not stored; charts and table start empty on each page load.
+- Suricata must be restarted when the PC joins another network.
+- Testing is done only in our own lab.
 
-## Run it live (quick start)
+## Prerequisites
 
-You need `model/rf_model.joblib`. It is not in Git (`.gitignore` skips `*.joblib`), so make it first:
+1. **Python 3**, a recent version. `requirements.txt` pins `scikit-learn==1.9.0`.
+2. **Suricata (Windows)** with **Npcap** in WinPcap API-compatible mode.
+3. **Suricata configuration**: `eve-log` must log both `flow` and `alert` events, and `campus-ids.rules` must be listed under `rule-files:`.
+4. **Kali Linux VM** in VMware with the network adapter set to **Bridged** for attack testing.
 
-```
-python design2/train_rf.py --input data/windows_labelled.csv
-```
+## Installation
 
-Then start the dashboard with the extra layer:
-
-```
-python dashboard/app.py --rf
+```bash
+pip install -r requirements.txt
 ```
 
-- The terminal should say `RF = on`. If it says `RF = OFF (...)`, the text in the brackets is the reason.
-- RF alerts show in the dashboard as the purple **Random Forest** source, with the attack probability in the score column.
-- Add `--rf-debug` to see the probability of every 10-second window that has 2 or more flows. This is the easiest way to see why RF is quiet.
-- `--rf-model <path>` uses another model file.
+## Execution Workflow
 
-What it looks like: an `nmap -sS -p 1-1000` scan from Kali (192.168.50.204) against the PC running Suricata.
-The Rule alert comes first, then Stats and Random Forest (the RF time is the end of its 10-second window). The ML row at the top is
-a separate, unrelated alert for normal UDP traffic.
+### Step 1: Set up the rules (first time only)
 
-![Dashboard during an nmap scan: Rule, Stats and Random Forest alerts](images/dashboard_rf_scan.png)
+Copy `suricata/rules/campus-ids.rules` to `C:\Program Files\Suricata\rules\`, add it to `rule-files:` in `suricata.yaml`, then test the config in an Administrator terminal:
 
-Things to know:
-
-- An RF alert comes **about 15 seconds after the attack**: the 10-second window has to end, and the detector
-  waits 5 seconds for late flow records. Rule and Stats alerts are still instant.
-- An IP needs at least 5 flows in a window before RF can alert on it (`min_flows`), and the same IP raises
-  one RF alert at most every 30 seconds (`cooldown`). Other settings: attack probability must reach 0.5.
-  These are arguments of `RFDetector` in `dashboard/rf_detector.py`.
-- Hidden IPs (own PC, trusted IPs in the Settings panel) are skipped by RF too.
-
-## Make new training data
-
-Do the attacks from the Kali VM, one by one, with `attack_logger.sh`, so every attack gets an exact label.
-
-On the Kali VM (target = the IP of the PC running Suricata, here 192.168.50.190; Kali itself is 192.168.50.204):
-
-```
-chmod +x attack_logger.sh                 # once
-TZ=Asia/Kuala_Lumpur date                 # check Kali's clock is right
-./attack_logger.sh portscan 192.168.50.204 sudo nmap -sS -p 1-1000 192.168.50.190
-./attack_logger.sh synflood 192.168.50.204 sudo hping3 -S -p 80 -i u5000 -c 500 192.168.50.190
+```powershell
+cd "C:\Program Files\Suricata"
+.\suricata.exe -T -c suricata.yaml
 ```
 
-Each run prints one line (start, end, attacker IP, label) and adds it to `attack_log.csv`.
-Copy these lines to the end of `design2/labels.csv` on the Windows PC. If the Kali clock is wrong, the labels are wrong.
+### Step 2: Start Suricata
 
-Then build the labelled windows and train again. `<eve.json files>` are all the files that contain your attacks
-(for us `C:\Program Files\Suricata\log\eve.json`; copy it to a safe place after every test session, because the
-file can be cleared):
+Open an Administrator PowerShell in the project folder:
 
-```
-python design2/aggregate.py --eve <eve.json files> --labels design2/labels.csv design2/labels_oct13.csv --attacker-ips 192.168.50.204 192.168.50.72 --out data/windows_labelled.csv
-python design2/train_rf.py --input data/windows_labelled.csv
+```powershell
+.\scripts\start_suricata.ps1
 ```
 
-- A window is labelled as an attack if it comes from the attacker IP, overlaps an attack time, and has at least 5 flows.
-- Windows from an attacker machine outside every attack time are "ambiguous" and left out.
-- Everything else is "benign".
-- If train_rf.py says the attack runs come from fewer than 2 days, the cross-validation cannot run.
+Suricata writes events to `C:\Program Files\Suricata\log\eve.json`.
 
-Add `--ignore-ips 192.168.50.190` to `train_rf.py` to leave out your own PC when you check the results.
+### Step 3: Train the ML model (first time only)
 
-## Results so far
-
-Same windows for every method: 16,820 windows from the days with attacks (our own PC left out), of which 60 are
-attack windows (40 port scan, 20 SYN flood). Random Forest is tested with leave-one-day-out cross-validation: every
-window is predicted by a model that never saw that day. The Design 1 layers need no training on attacks; they were
-replayed from the real `eve.json` through `dashboard/detection.py`.
-
-| Method | Attacks found | False-alarm windows | Precision | Recall | F1 |
-|---|---|---|---|---|---|
-| Design 1 Isolation Forest layer | 0 of 60 | 291 | 0.00 | 0.00 | 0.00 |
-| Design 1 Suricata rule layer | 60 of 60 | 305 | 0.16 | 1.00 | 0.28 |
-| Design 1 Stats layer (15 ports / 150 flows) | 58 of 60 | 2 | 0.97 | 0.97 | 0.97 |
-| Design 1 all layers together | 60 of 60 | 585 | 0.09 | 1.00 | 0.17 |
-| **Design 2 Random Forest** | 45 of 60 | 0 | 1.00 | 0.75 | 0.86 |
-
-What this means:
-
-- Design 2 is much better than the Isolation Forest layer, which found none of our Kali attacks.
-- Design 2 is **not** better than the Stats layer of Design 1: Stats found more attacks (58 vs 45) with almost as few false alarms.
-  The Random Forest adds no attack that the Design 1 layers did not already find.
-- The Random Forest has no false alarms, while the rule layer and the Isolation Forest raise many alerts on normal traffic.
-- So for now Design 2 is an optional extra layer that learns from data, not a replacement. Whether it helps on other attacks
-  (other tools, slower scans) still has to be tested.
-- Only 60 attack windows from a few runs, so treat small differences as noise. The Stats limits were chosen while looking at part of
-  these data, so none of the numbers is a final, independent test.
-
-Live tests from Kali against the Windows PC:
-
-- `nmap -sS -p 1-1000`: RF alert with 1591 flows, 934 ports, attack probability 1.0.
-- `hping3 -S -p 80 --flood`: RF alert with 20310 flows, but only probability 0.70, so the model is less sure about floods.
-
-Reproduce the table (takes a few minutes on a 5 GB `eve.json`):
-
-```
-python evaluation/compare_designs.py --eve <eve.json files> --ignore-ips 192.168.50.190
+```powershell
+python suricata/read_suricata_flows.py --input "C:\Program Files\Suricata\log\eve.json" --output data/suricata_flow_features.csv
+python model/train_model.py --input data/suricata_flow_features.csv --model_out model/ids_model.joblib --scaler_out model/ids_scaler.joblib
 ```
 
-The Design 1 rows are only real when `--eve` points to the files that contain the attacks. The rows that apply the two limits
-to the fixed windows (without `--eve` they are the only Design 1 rows) over-count ports, so use the "live replay" row.
+### Step 4: Launch the dashboard
 
-## Limits
+```powershell
+python dashboard/app.py
+```
 
-- Slow scans are missed (`nmap -T2` touches only about 13 ports per window); Design 1 missed them too.
-- Little attack data: one Kali VM, one other device, two attack types. The model may not work on other tools or speeds.
-- Flood probability was low in one live test (0.70). Test more flood speeds.
-- About 15 seconds of delay for RF alerts.
-- CIC-IDS2017: the Friday files in `evaluation/` have no Source IP and no Timestamp, so no per-IP windows can be built.
-  `cicids_check.py` needs the TrafficLabelling version. CIC also counts bytes differently from Suricata, so train without
-  `total_bytes` for that check (command in the file's header).
-- The Stats limits and the model features were chosen while looking at part of this data, so none of the numbers is a final, independent test.
+Open **http://127.0.0.1:5000**. The capture check banner should turn green once Suricata delivers traffic.
 
-## Troubleshooting
+### Step 5: Run attack tests from the Kali VM
 
-| Problem | What to do |
-|---|---|
-| `RF = OFF (...)` at start | Read the text in the brackets. Usually the model file is missing: run `train_rf.py`. |
-| Model was trained with another scikit-learn version | Run `train_rf.py` again on your own computer. |
-| RF shows no alert during an attack | Wait 20 seconds, then run with `--rf-debug` and look at `p(attack)`. |
-| `[RF debug] ... (fewer than min_flows: never alerts)` | That IP had fewer than 5 flows in the window. Normal for quiet traffic. |
-| Labels do not match the attacks | Check Kali's clock and that `--attacker-ips` lists every machine used for attacks. |
+Run these from the Kali VM, not from the PC running Suricata:
+
+```bash
+ping -c 4 <TARGET_IP>
+sudo nmap -sS -p 1-1000 <TARGET_IP>
+sudo hping3 -S -p 80 -i u10000 -c 500 <TARGET_IP>
+```
+
+### Step 6: Cross-dataset evaluation (ML layer)
+
+```powershell
+python evaluation/evaluate_cicids.py --input evaluation/Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv evaluation/Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv --model model/ids_model.joblib --scaler model/ids_scaler.joblib --out evaluation/cicids_evaluation.csv
+```
+
+## When the PC Joins Another Network
+
+1. The dashboard follows the new address within about 5 seconds.
+2. Stop Suricata with `Ctrl + C` and run `.\scripts\start_suricata.ps1` again.
+3. On the Kali VM, get a new address in the new network before running attacks.
+
+## Settings Quick Reference
+
+| Setting | Meaning | Default |
+|---|---|---|
+| This PC's IP address | Rule and Stats alerts from it are hidden. *Detect automatically* is on by default | detected |
+| Trusted IPs or ranges | Other sources to hide, e.g. router or phone | none |
+| Port scan: different ports | Different ports on one host within the window that count as a port scan | 15 |
+| Flood: connections | Connections from one source within the window that count as a flood | 150 |
+| Time window | Look-back window in seconds | 10 |
+| Cooldown | Seconds before the same source raises the same Stats alert again | 30 |
 
 ## Tests
 
+```bash
+python tests/test_settings.py
 ```
-python tests/test_rf_detector.py
+
+Unit tests for settings validation, IP matching, live setting changes, automatic IP, capture check, and the settings web API.
+
+## Project Layout
+
+```text
+dashboard/        Flask app, detection layers, settings, web page
+suricata/         Suricata rules and eve.json flow feature extraction
+model/            Isolation Forest training script and saved model/scaler
+evaluation/       CIC-IDS2017 evaluation script and results
+scripts/          start_suricata.ps1, replay_demo.py, attack simulation scripts
+docs/             lab-setup.md, suricata-config.md, dashboard-settings.md
+tests/            unit tests
+data/             baseline flow features
 ```
+
+## Safe Shutdown
+
+1. **Dashboard:** press `Ctrl + C` in the terminal running `app.py`.
+2. **Suricata:** press `Ctrl + C` in the Administrator terminal and wait until it prints `Engine shut down`.
+
+## Troubleshooting
+
+- **Permission denied:** run PowerShell as Administrator.
+- **"no rules were loaded":** keep every rule on one line and save as plain text, e.g. with `Set-Content -Encoding ascii`.
+- **Banner says "none involve this PC":** Suricata listens on another network. Restart it with `.\scripts\start_suricata.ps1`.
+- **No alerts from attacks:** ensure Kali is in **Bridged** mode, the target is the real LAN IP, and loopback `127.0.0.1` is not used.
+- **Settings cannot be saved:** settings can only be changed from a browser on the PC running the dashboard.
+
+## Design 2 - Random Forest layer (optional)
+
+A second detector that looks at one source IP over 10 seconds and decides "attack or normal" with a Random Forest. Start the dashboard with `python dashboard/app.py --rf` to add it as a purple "Random Forest" layer. How it works, how to train it and the results are in [design2/README.md](design2/README.md).
