@@ -7,7 +7,7 @@
     <title>Campus IDS - Real-Time Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-:root{--bg:#0e1726;--panel:#152238;--line:#243653;--text:#e8eef7;--muted:#8fa3bf;--rule:#ff6b57;--stats:#3cc8e8;--ml:#f2b94b;--accent:#4a7de0}
+:root{--bg:#0e1726;--panel:#152238;--line:#243653;--text:#e8eef7;--muted:#8fa3bf;--rule:#ff6b57;--stats:#3cc8e8;--ml:#f2b94b;--rf:#a78bfa;--accent:#4a7de0}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;font-variant-numeric:tabular-nums}
 .container{max-width:1180px;margin:0 auto;padding:28px 24px 48px}
@@ -26,7 +26,7 @@ h2{margin:0;font-size:1rem;font-weight:600}
 .lg{background:transparent;color:var(--text);border:1px solid var(--line);padding:5px 12px;border-radius:999px;display:flex;gap:7px;align-items:center;font-size:.88rem}
 .lg:hover{border-color:var(--muted)}.lg.dim{opacity:.4}.lg b{font-weight:650}
 .lg i{width:10px;height:10px;border-radius:50%;display:inline-block}
-.lg-rule i{background:var(--rule)}.lg-stats i{background:var(--stats)}.lg-ml i{background:var(--ml)}
+.lg-rule i{background:var(--rule)}.lg-stats i{background:var(--stats)}.lg-ml i{background:var(--ml)}.lg-rf i{background:var(--rf)}
 .chart svg{width:100%;height:auto;display:block}
 .grid{stroke:var(--line);stroke-width:1}.axis{fill:var(--muted);font-size:10px}
 .big{fill:var(--text);font-size:22px;font-weight:650}.ring{fill:none;stroke:var(--line);stroke-width:14}
@@ -49,10 +49,10 @@ button.gray{background:#2a3b5a}button:disabled{opacity:.5;cursor:not-allowed}
 table{width:100%;border-collapse:collapse}
 th,td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--line);font-size:.9rem}
 th{color:var(--muted);font-weight:600;font-size:.82rem;background:#101c30}tr:last-child td{border-bottom:none}
-.row-rule,.row-stats,.row-ml{animation:fresh 1.6s ease-out}
-.row-rule{background:rgba(255,107,87,.07)}.row-stats{background:rgba(60,200,232,.07)}.row-ml{background:rgba(242,185,75,.07)}
-.row-rule td:first-child{box-shadow:inset 3px 0 0 var(--rule)}.row-stats td:first-child{box-shadow:inset 3px 0 0 var(--stats)}.row-ml td:first-child{box-shadow:inset 3px 0 0 var(--ml)}
-td:nth-child(2){font-weight:600}.row-rule td:nth-child(2){color:var(--rule)}.row-stats td:nth-child(2){color:var(--stats)}.row-ml td:nth-child(2){color:var(--ml)}
+.row-rule,.row-stats,.row-ml,.row-rf{animation:fresh 1.6s ease-out}
+.row-rule{background:rgba(255,107,87,.07)}.row-stats{background:rgba(60,200,232,.07)}.row-ml{background:rgba(242,185,75,.07)}.row-rf{background:rgba(167,139,250,.08)}
+.row-rule td:first-child{box-shadow:inset 3px 0 0 var(--rule)}.row-stats td:first-child{box-shadow:inset 3px 0 0 var(--stats)}.row-ml td:first-child{box-shadow:inset 3px 0 0 var(--ml)}.row-rf td:first-child{box-shadow:inset 3px 0 0 var(--rf)}
+td:nth-child(2){font-weight:600}.row-rule td:nth-child(2){color:var(--rule)}.row-stats td:nth-child(2){color:var(--stats)}.row-ml td:nth-child(2){color:var(--ml)}.row-rf td:nth-child(2){color:var(--rf)}
 @keyframes fresh{from{background-color:rgba(255,255,255,.2)}}
 .score-high{color:var(--ml);font-weight:600}.empty-msg{text-align:center;padding:28px;color:var(--muted)}
 #settings-panel{display:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:0 0 14px}
@@ -90,6 +90,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
                     <button class="lg lg-rule" onclick="pick('Rule')"><i></i>Rule alerts <b id="count-rule">0</b></button>
                     <button class="lg lg-stats" onclick="pick('Stats')"><i></i>Scans and floods <b id="count-stats">0</b></button>
                     <button class="lg lg-ml" onclick="pick('ML')"><i></i>ML anomalies <b id="count-ml">0</b></button>
+                    <button class="lg lg-rf" id="lg-rf" style="display:none" onclick="pick('RF')"><i></i>Random Forest <b id="count-rf">0</b></button>
                 </div>
             </div>
             <div id="chart-timeline" class="chart"></div>
@@ -113,6 +114,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
                     <option value="Rule">Rule alerts only</option>
                     <option value="ML">ML anomalies only</option>
                     <option value="Stats">Scans and floods only</option>
+                    <option value="RF">Random Forest only</option>
                 </select>
             </label>
             <button class="gray" onclick="toggleSettings()">Settings</button>
@@ -194,8 +196,8 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
 
     <script>
         const socket = io();
-        const counts = { Rule: 0, ML: 0, Stats: 0 };
-        const rowClass = { Rule: 'row-rule', ML: 'row-ml', Stats: 'row-stats' };
+        const counts = { Rule: 0, ML: 0, Stats: 0, RF: 0 };
+        const rowClass = { Rule: 'row-rule', ML: 'row-ml', Stats: 'row-stats', RF: 'row-rf' };
 
         socket.on('connect', function () {
             const statusEl = document.getElementById('connection-status');
@@ -227,6 +229,8 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
             document.getElementById('count-rule').textContent = counts.Rule;
             document.getElementById('count-ml').textContent = counts.ML;
             document.getElementById('count-stats').textContent = counts.Stats;
+            document.getElementById('count-rf').textContent = counts.RF;
+            document.getElementById('lg-rf').style.display = '';   // the RF button only appears once the layer has raised an alert
             recordAlert(src, data.src_ip);
 
             const row = document.createElement('tr');
@@ -241,7 +245,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
             addCell(row, data.proto);
             addCell(row, data.detail || '');
             addCell(row, data.severity || '-');
-            addCell(row, data.score === null || data.score === undefined ? '-' : data.score, src === 'ML' ? 'score-high' : '');
+            addCell(row, data.score === null || data.score === undefined ? '-' : data.score, (src === 'ML' || src === 'RF') ? 'score-high' : '');
 
             tableBody.insertBefore(row, tableBody.firstChild);
             applyFilter();
@@ -360,8 +364,8 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
         }
 
 // ---------------- charts (plain SVG, no internet needed) ----------------
-        const COLORS = { Rule: '#ff6b57', Stats: '#3cc8e8', ML: '#f2b94b' };
-        const LAYERS = ['Rule', 'Stats', 'ML'];
+        const COLORS = { Rule: '#ff6b57', Stats: '#3cc8e8', ML: '#f2b94b', RF: '#a78bfa' };
+        const LAYERS = ['Rule', 'Stats', 'ML', 'RF'];
         const alertsLog = [];          // what arrived since this page was opened
 
         function recordAlert(src, ip) {
@@ -387,11 +391,11 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
         function renderTimeline() {
             const BINS = 20, SPAN = 30000, now = Date.now(), start = now - BINS * SPAN;
             const bins = [];
-            for (let i = 0; i < BINS; i++) bins.push({ Rule: 0, Stats: 0, ML: 0 });
+            for (let i = 0; i < BINS; i++) bins.push({ Rule: 0, Stats: 0, ML: 0, RF: 0 });
             alertsLog.forEach(function (a) {
                 if (a.t >= start) bins[Math.min(BINS - 1, Math.floor((a.t - start) / SPAN))][a.source]++;
             });
-            const max = Math.max(4, Math.max.apply(null, bins.map(function (b) { return b.Rule + b.Stats + b.ML; })));
+            const max = Math.max(4, Math.max.apply(null, bins.map(function (b) { return b.Rule + b.Stats + b.ML + b.RF; })));
             const W = 640, H = 190, L = 28, R = 8, T = 8, B = 24, cw = (W - L - R) / BINS, ch = H - T - B;
             let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Alerts per 30 seconds, stacked by detection layer">';
             [0, 0.5, 1].forEach(function (f) {
@@ -416,7 +420,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
         }
 
         function renderDonut() {
-            const tot = counts.Rule + counts.Stats + counts.ML, R = 46, C = 2 * Math.PI * R;
+            const tot = counts.Rule + counts.Stats + counts.ML + counts.RF, R = 46, C = 2 * Math.PI * R;
             let s = '<svg class="donut" viewBox="0 0 120 120" role="img" aria-label="Share of alerts by detection layer"><circle class="ring" cx="60" cy="60" r="' + R + '"/>';
             let off = 0;
             LAYERS.forEach(function (k) {
@@ -427,7 +431,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
                 off += len;
             });
             s += '<text class="big" x="60" y="62" text-anchor="middle">' + tot + '</text><text class="axis" x="60" y="78" text-anchor="middle">alerts</text></svg>';
-            const names = { Rule: 'Rule alerts', Stats: 'Scans and floods', ML: 'ML anomalies' };
+            const names = { Rule: 'Rule alerts', Stats: 'Scans and floods', ML: 'ML anomalies', RF: 'Random Forest' };
             s += '<div>' + LAYERS.map(function (k) {
                 const pct = tot ? Math.round(100 * counts[k] / tot) : 0;
                 return '<div class="hint" style="margin:3px 0;color:var(--text)"><span style="color:' + COLORS[k] + '">&#9679;</span> ' + names[k] + ' ' + pct + '%</div>';

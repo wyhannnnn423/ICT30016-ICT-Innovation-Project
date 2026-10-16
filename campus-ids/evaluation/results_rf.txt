@@ -1,0 +1,127 @@
+Loaded 34501 windows: benign=34405, portscan=40, synflood=20, portscan_slow_T2=9, portscan_fin=3, synflood_fast_80=3, synflood_1000pps=3, synflood_100pps=3, synflood_20pps=3, synflood_10pps=3, portscan_t5=2, synflood_fast_443=2, portscan_top100=1, portscan_connect=1, portscan_service=1, udpscan=1, udpflood=1
+Windows per day (attack/total): 2026-09-25=0/339, 2026-09-26=0/5866, 2026-09-29=0/473, 2026-10-03=20/6846, 2026-10-04=7/325, 2026-10-08=11/4931, 2026-10-09=0/722, 2026-10-13=22/10075, 2026-10-14=0/1638, 2026-10-15=36/3286
+Features: ['conn_count', 'distinct_ports', 'rst_ratio', 'avg_pkts', 'total_bytes']
+
+Fold: test day 2026-10-03 (trained on the other days)
+  windows: 6846  (attack 20, benign 6826)
+  TP=20  FN=0  FP=1  TN=6825
+  precision=0.952  recall=1.000  F1=0.976  false-positive rate=0.0001
+  recall portscan: 14/14
+  recall synflood: 6/6
+
+Fold: test day 2026-10-04 (trained on the other days)
+  windows: 325  (attack 7, benign 318)
+  TP=7  FN=0  FP=0  TN=318
+  precision=1.000  recall=1.000  F1=1.000  false-positive rate=0.0000
+  recall portscan: 6/6
+  recall synflood: 1/1
+
+Fold: test day 2026-10-08 (trained on the other days)
+  windows: 4931  (attack 11, benign 4920)
+  TP=11  FN=0  FP=1  TN=4919
+  precision=0.917  recall=1.000  F1=0.957  false-positive rate=0.0002
+  recall portscan: 4/4
+  recall synflood: 7/7
+
+Fold: test day 2026-10-13 (trained on the other days)
+  windows: 10075  (attack 22, benign 10053)
+  TP=21  FN=1  FP=0  TN=10053
+  precision=1.000  recall=0.955  F1=0.977  false-positive rate=0.0000
+  recall portscan: 15/16
+  recall synflood: 6/6
+
+Fold: test day 2026-10-15 (trained on the other days)
+  windows: 3286  (attack 36, benign 3250)
+  TP=27  FN=9  FP=22  TN=3228
+  precision=0.551  recall=0.750  F1=0.635  false-positive rate=0.0068
+  recall portscan_connect: 1/1
+  recall portscan_fin: 3/3
+  recall portscan_service: 1/1
+  recall portscan_slow_T2: 8/9
+  recall portscan_t5: 2/2
+  recall portscan_top100: 1/1
+  recall synflood_1000pps: 3/3
+  recall synflood_100pps: 3/3
+  recall synflood_10pps: 2/3
+  recall synflood_20pps: 3/3
+  recall synflood_fast_443: 0/2
+  recall synflood_fast_80: 0/3
+  recall udpflood: 0/1
+  recall udpscan: 0/1
+
+ALL FOLDS POOLED
+  windows: 25463  (attack 96, benign 25367)
+  TP=86  FN=10  FP=24  TN=25343
+  precision=0.782  recall=0.896  F1=0.835  false-positive rate=0.0009
+  recall portscan: 39/40
+  recall portscan_connect: 1/1
+  recall portscan_fin: 3/3
+  recall portscan_service: 1/1
+  recall portscan_slow_T2: 8/9
+  recall portscan_t5: 2/2
+  recall portscan_top100: 1/1
+  recall synflood: 20/20
+  recall synflood_1000pps: 3/3
+  recall synflood_100pps: 3/3
+  recall synflood_10pps: 2/3
+  recall synflood_20pps: 3/3
+  recall synflood_fast_443: 0/2
+  recall synflood_fast_80: 0/3
+  recall udpflood: 0/1
+  recall udpscan: 0/1
+
+False positives (benign windows predicted as attack), up to 10:
+               src_ip                    window   label  conn_count  distinct_ports  rst_ratio  avg_pkts  total_bytes
+10292    192.168.50.1 2026-10-15 01:56:20+00:00  benign          62              62   0.000000  1.080645        12899
+12644  192.168.50.190 2026-10-03 06:59:50+00:00  benign          34              34   0.878788  2.323529         6880
+14613  192.168.50.190 2026-10-08 09:05:20+00:00  benign         111               4   0.800000  2.738739        54389
+17443  192.168.50.190 2026-10-15 01:32:30+00:00  benign         159             140   0.000000  2.314465        22302
+17444  192.168.50.190 2026-10-15 01:32:40+00:00  benign        1956            1948   0.000000  2.383947       297498
+17445  192.168.50.190 2026-10-15 01:32:50+00:00  benign        1795            1741   0.000000  2.518663       300638
+17446  192.168.50.190 2026-10-15 01:33:00+00:00  benign        1259            1123   0.000000  2.220016       194722
+17447  192.168.50.190 2026-10-15 01:33:10+00:00  benign         756             690   0.000000  2.195767        97470
+17448  192.168.50.190 2026-10-15 01:33:20+00:00  benign         755             715   0.000000  2.255629       122950
+17449  192.168.50.190 2026-10-15 01:33:30+00:00  benign         922             815   0.000000  2.482646       153778
+
+Missed attacks (attack windows predicted as benign):
+               src_ip                    window              label  conn_count  distinct_ports  rst_ratio   avg_pkts  total_bytes
+18760  192.168.50.204 2026-10-13 06:21:10+00:00           portscan          40              20   0.000000   2.000000         4800
+18798  192.168.50.204 2026-10-15 07:23:50+00:00   portscan_slow_T2          17               9   0.058824   2.235294         2276
+18799  192.168.50.204 2026-10-15 07:24:30+00:00   synflood_fast_80       59222               1   0.624667   9.974233     34839654
+18800  192.168.50.204 2026-10-15 07:24:40+00:00   synflood_fast_80      105790               2   0.271975   4.911835     30720578
+18801  192.168.50.204 2026-10-15 07:24:50+00:00   synflood_fast_80       62431               2   0.000000   1.000000      3745920
+18802  192.168.50.204 2026-10-15 07:25:30+00:00  synflood_fast_443      105351               1   0.603260  10.470750     65058770
+18803  192.168.50.204 2026-10-15 07:25:40+00:00  synflood_fast_443      102905               1   0.064496   2.053933     12558324
+18815  192.168.50.204 2026-10-15 07:29:40+00:00     synflood_10pps          23               1   1.000000   6.000000         8188
+18816  192.168.50.204 2026-10-15 07:30:20+00:00            udpscan         100              50   0.000000   3.000000        28972
+18817  192.168.50.204 2026-10-15 07:31:00+00:00           udpflood       65536               1   0.000000  33.319397    131017200
+
+REFERENCE: fixed rule (distinct_ports >= 15 or conn_count >= 150) on the same windows
+  windows: 25463  (attack 96, benign 25367)
+  TP=71  FN=25  FP=79  TN=25288
+  precision=0.473  recall=0.740  F1=0.577  false-positive rate=0.0031
+  recall portscan: 31/40
+  recall portscan_connect: 1/1
+  recall portscan_fin: 3/3
+  recall portscan_service: 1/1
+  recall portscan_slow_T2: 0/9
+  recall portscan_t5: 2/2
+  recall portscan_top100: 1/1
+  recall synflood: 17/20
+  recall synflood_1000pps: 3/3
+  recall synflood_100pps: 3/3
+  recall synflood_10pps: 0/3
+  recall synflood_20pps: 2/3
+  recall synflood_fast_443: 2/2
+  recall synflood_fast_80: 3/3
+  recall udpflood: 1/1
+  recall udpscan: 1/1
+
+Feature importance of the final model (trained on all days):
+  conn_count      0.472
+  rst_ratio       0.272
+  distinct_ports  0.105
+  total_bytes     0.094
+  avg_pkts        0.057
+
+[Done] Final model saved to model/rf_model.joblib
