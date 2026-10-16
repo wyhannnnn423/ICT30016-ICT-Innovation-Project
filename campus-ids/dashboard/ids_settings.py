@@ -1,4 +1,4 @@
-"""
+﻿"""
 ids_settings.py
 ------------------------
 Settings of the dashboard: validation, storage and IP matching.
@@ -268,3 +268,4 @@ def host_header_ok(host):
     else:
         name = host
     return name.lower() == "localhost" or _parse_ip(name) is not None
+
