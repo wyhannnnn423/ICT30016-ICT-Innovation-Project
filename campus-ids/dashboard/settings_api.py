@@ -1,4 +1,4 @@
-"""
+﻿"""
 settings_api.py
 ------------------------
 The two web endpoints behind the dashboard's Settings panel.
@@ -57,3 +57,4 @@ def register(app, get_detector, settings_path):
         except OSError as e:
             warning = f"Applied, but could not be saved to disk: {e}"
         return jsonify(ok=True, settings=detector.get_settings(), warning=warning)
+
