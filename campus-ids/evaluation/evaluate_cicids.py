@@ -30,7 +30,7 @@ Usage:
     python evaluate_cicids.py \
         --input Friday-WorkingHours-Afternoon-DDos_pcap_ISCX.csv \
                 Friday-WorkingHours-Afternoon-PortScan_pcap_ISCX.csv \
-        --model model/ids_model.joblib --scaler model/ids_scaler.joblib
+        --model design1/model/ids_model.joblib --scaler design1/model/ids_scaler.joblib
 """
 
 import argparse
