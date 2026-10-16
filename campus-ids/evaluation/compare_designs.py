@@ -290,6 +290,8 @@ def main():
         hybrid = ((flag["Rule"] + flag["Stats"] + flag["ML"]) > 0).astype(int)
         add("Design 1 hybrid (Rule or Stats or ML)", hybrid, False)
         add("Design 1 Stats layer + Design 2 together (either alerts)", ((flag["Stats"] + rf) > 0).astype(int), True)
+        add("Design 2 as planned in the report (Rule or Stats or Random Forest, no Isolation Forest)",
+            ((flag["Rule"] + flag["Stats"] + rf) > 0).astype(int), True)
         add("Design 2 Random Forest", rf, True)
         add("Design 1 + Design 2 together", ((hybrid + rf) > 0).astype(int), True)
     else:

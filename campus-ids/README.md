@@ -208,6 +208,8 @@ data/             baseline flow features
 - **No alerts from attacks:** ensure Kali is in **Bridged** mode, the target is the real LAN IP, and loopback `127.0.0.1` is not used.
 - **Settings cannot be saved:** settings can only be changed from a browser on the PC running the dashboard.
 
-## Design 2 - Random Forest layer (optional)
+## Design 2 - Random Forest layer
 
-A second detector that looks at one source IP over 10 seconds and decides "attack or normal" with a Random Forest. Start the dashboard with `python dashboard/app.py --rf` to add it as a purple "Random Forest" layer. How it works, how to train it and the results are in [design2/README.md](design2/README.md).
+Design 2 replaces the Isolation Forest layer with a Random Forest: Rule + Stats + Random Forest.
+Run it with: python dashboard/app.py --design2
+How it works, how to train it and the results are in design2/README.md.
