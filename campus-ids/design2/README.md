@@ -61,6 +61,12 @@ python dashboard/app.py --rf
 - Add `--rf-debug` to see the probability of every 10-second window that has 2 or more flows. This is the easiest way to see why RF is quiet.
 - `--rf-model <path>` uses another model file.
 
+What it looks like: an `nmap -sS -p 1-1000` scan from Kali (192.168.50.204) against the PC running Suricata.
+The Rule alert comes first, then Stats and Random Forest (the RF time is the end of its 10-second window). The ML row at the top is
+a separate, unrelated alert for normal UDP traffic.
+
+![Dashboard during an nmap scan: Rule, Stats and Random Forest alerts](images/dashboard_rf_scan.png)
+
 Things to know:
 
 - An RF alert comes **about 15 seconds after the attack**: the 10-second window has to end, and the detector
@@ -104,37 +110,51 @@ Add `--ignore-ips 192.168.50.190` to `train_rf.py` to leave out your own PC when
 
 ## Results so far
 
-Same windows for both designs (20,575 windows, 60 attack windows: 40 port scan, 20 SYN flood).
-Random Forest is tested with leave-one-day-out cross-validation: every window is predicted by a model that never saw that day.
+Same windows for every method: 20,685 windows from the 5 days with attacks (our own PC left out), of which 96 are
+attack windows (port scans of 7 kinds, SYN floods of 7 speeds, one UDP scan, one UDP flood). Random Forest is tested with
+leave-one-day-out cross-validation: every window is predicted by a model that never saw that day. The Design 1 layers need
+no training on attacks; they were replayed from the real `eve.json` through `dashboard/detection.py`.
 
-| Method | Precision | Recall | False alarms |
-|---|---|---|---|
-| Random Forest | 0.92 | 0.75 | 4 (all from our own PC) |
-| Design 1 Stats, fixed limits (15 ports or 150 flows) | 0.49 | 0.80 | 51 (mostly our own PC) |
+| Method | Attacks found | False-alarm windows | Precision | Recall | F1 |
+|---|---|---|---|---|---|
+| Design 1 Isolation Forest layer | 0 of 96 | 298 | 0.00 | 0.00 | 0.00 |
+| Design 1 Suricata rule layer | 82 of 96 | 310 | 0.21 | 0.85 | 0.34 |
+| Design 1 Stats layer | 90 of 96 | 6 | 0.94 | 0.94 | 0.94 |
+| Design 1 all layers together | 95 of 96 | 601 | 0.14 | 0.99 | 0.24 |
+| **Design 2 Random Forest** | 86 of 96 | 1 | 0.99 | 0.90 | 0.94 |
 
-When our own PC is hidden, as the dashboard does: both have no false alarms and recall 0.75 (RF) vs 0.80 (Stats).
-So the prototype does **not** show that Design 2 detects more than the Stats layer. What it does show is that scans and
-floods can be learned from data, without hand-set limits. The Isolation Forest layer flagged none of our Kali attacks.
+What this means:
+
+- Design 2 is much better than the Isolation Forest layer, which found none of our attacks.
+- Design 2 and the Stats layer end up equal overall (F1 0.94 both), but they miss **different** attacks:
+  - The Stats layer missed all 3 windows of the slowest SYN flood (10 packets per second); the Random Forest found 2 of them.
+  - The Random Forest missed the full-speed `hping3 --flood` runs (0 of 5 windows) and the UDP flood and UDP scan (0 of 1 each);
+    the Stats layer found all of them.
+- The Random Forest has the fewest false alarms (1 window). The rule layer and the Isolation Forest raise hundreds on normal traffic.
+- So Design 2 looks more useful as a second layer next to Stats than as a replacement for it.
+- Only 96 attack windows from a few runs (some attack kinds have 1 to 3 windows), so treat small differences as noise. The Stats limits
+  were chosen while looking at part of these data, so none of the numbers is a final, independent test.
+- No ICMP flood window appears: an ICMP flood is only a handful of flows (no ports), so its windows have fewer than 5 flows and are left out.
 
 Live tests from Kali against the Windows PC:
 
 - `nmap -sS -p 1-1000`: RF alert with 1591 flows, 934 ports, attack probability 1.0.
 - `hping3 -S -p 80 --flood`: RF alert with 20310 flows, but only probability 0.70, so the model is less sure about floods.
 
-Reproduce the Design 1 vs Design 2 table:
+Reproduce the table (takes a few minutes on a 5 GB `eve.json`):
 
 ```
 python evaluation/compare_designs.py --eve <eve.json files> --ignore-ips 192.168.50.190
 ```
 
-The Rule and ML rows only work when `--eve` points to the files that contain the attacks. With the wrong or a
-new `eve.json` they show 0 detections, which is not a real result.
+The Design 1 rows are only real when `--eve` points to the files that contain the attacks. The rows that apply the two limits
+to the fixed windows (without `--eve` they are the only Design 1 rows) over-count ports, so use the "live replay" row.
 
 ## Limits
 
-- Slow scans are missed (`nmap -T2` touches only about 13 ports per window); Design 1 missed them too.
+- Very slow attacks are missed: a SYN flood of 10 packets per second was missed by the Stats layer (0 of 3 windows) and found by the Random Forest in 2 of 3.
 - Little attack data: one Kali VM, one other device, two attack types. The model may not work on other tools or speeds.
-- Flood probability was low in one live test (0.70). Test more flood speeds.
+- The Random Forest missed all full-speed `hping3 --flood` windows on the held-out day (0 of 5) and had low confidence (0.70) in the live flood test. It also missed the UDP attacks, which it has never seen in training.
 - About 15 seconds of delay for RF alerts.
 - CIC-IDS2017: the Friday files in `evaluation/` have no Source IP and no Timestamp, so no per-IP windows can be built.
   `cicids_check.py` needs the TrafficLabelling version. CIC also counts bytes differently from Suricata, so train without
