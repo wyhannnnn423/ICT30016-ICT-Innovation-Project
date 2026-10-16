@@ -1,4 +1,4 @@
-"""
+﻿"""
 stats_detector.py
 ------------------------
 Simple per-source-IP statistical detector (no ML, no training data needed).
@@ -65,3 +65,4 @@ class ScanFloodDetector:
             del self.events[src]
         for key in [k for k, t in self.last_alert.items() if now - t > self.cooldown]:
             del self.last_alert[key]
+
