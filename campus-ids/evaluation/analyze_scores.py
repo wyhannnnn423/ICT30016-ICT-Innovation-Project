@@ -17,7 +17,7 @@ This script lets you:
 
 Usage:
     python analyze_scores.py --input data/suricata_flow_features.csv \
-        --model model/ids_model.joblib --scaler model/ids_scaler.joblib
+        --model design1/model/ids_model.joblib --scaler design1/model/ids_scaler.joblib
 """
 
 import argparse
