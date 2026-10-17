@@ -1,6 +1,8 @@
 __pycache__/
 *.pyc
 *.joblib
+!design1/model/ids_*.joblib
+!design2/model/rf_model.joblib
 .venv/
 venv/
 .DS_Store
