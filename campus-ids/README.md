@@ -4,7 +4,7 @@ A lightweight, lab-tested intrusion detection system for a campus-style network.
 
 > Tested only in a controlled lab (Kali VM attacker, Windows target) and on CIC-IDS2017 as a benchmark. Not validated on a live campus network.
 
-![Dashboard](assets/dashboard.jpg)
+![Dashboard](assets/dashboard.png)
 
 ## Detection layers
 
@@ -25,10 +25,10 @@ A lightweight, lab-tested intrusion detection system for a campus-style network.
 
 Design 2 is Design 1 plus one extra layer, so nothing Design 1 detects is lost.
 
-| Result in screenshot | Design 1 | Design 2 |
-|---|---|---|
-| ![](assets/design1result.png) | Ping, scan, flood, big TCP flows (ML) | |
-| ![](assets/design2result.png) | | Ping, scan, flood, RF alerts |
+| Design 1 result | Design 2 result |
+|---|---|
+| <img src="assets/design1result.png" width="100%"> | <img src="assets/design2result.png" width="100%"> |
+| Rule, Stats and ML alerts | Same, plus purple Random Forest alerts |
 
 ## Setup
 
@@ -48,7 +48,7 @@ Useful options: `--eve <path>`, `--own-ip <IP>`, `--host 0.0.0.0`, `--port 5000`
 
 Open **Settings → Attack commands** in the dashboard. The target IP is filled in; copy each command and run it on the Kali VM (never against a machine you do not own). Setup: [docs/lab-setup.md](docs/lab-setup.md).
 
-![Settings](assets/settings.jpg)
+![Settings](assets/settings.png)
 
 For "Big TCP flows", copy `scripts/simulate_attack_v3.py` to Kali and run `python scripts/tcp_sink.py 9000` on the target PC first.
 
