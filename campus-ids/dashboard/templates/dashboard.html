@@ -433,7 +433,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
             });
             s += '<text class="big" x="60" y="62" text-anchor="middle">' + tot + '</text><text class="axis" x="60" y="78" text-anchor="middle">alerts</text></svg>';
             const names = { Rule: 'Rule alerts', Stats: 'Scans and floods', ML: 'ML anomalies', RF: 'Random Forest' };
-            s += '<div>' + LAYERS.map(function (k) {
+            s += '<div>' + LAYERS.filter(function (k) { return k !== 'RF' || counts.RF > 0; }).map(function (k) {
                 const pct = tot ? Math.round(100 * counts[k] / tot) : 0;
                 return '<div class="hint" style="margin:3px 0;color:var(--text)"><span style="color:' + COLORS[k] + '">&#9679;</span> ' + names[k] + ' ' + pct + '%</div>';
             }).join('') + '</div>';
