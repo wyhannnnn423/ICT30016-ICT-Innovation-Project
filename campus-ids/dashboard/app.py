@@ -7,8 +7,8 @@ Tails Suricata's eve.json, runs every event through the detector (Rule + Stats +
 see detection.py) and pushes the alerts to the browser with Socket.IO.
 
 Examples:
-    python dashboard/app.py                                  # live Suricata log (Design 1: Isolation Forest)
-    python dashboard/app.py --design2                        # live Suricata log (Design 2: Random Forest)
+    python dashboard/app.py                                  # live Suricata log (Design 1: Rule + Stats + Isolation Forest)
+    python dashboard/app.py --design2                        # Design 2: the same three layers + Random Forest (RF)
     python dashboard/app.py --eve demo/eve_demo.json         # demo mode (see scripts/replay_demo.py)
     python dashboard/app.py --own-ip 192.168.50.190          # hide alerts caused by this PC itself
 
@@ -84,6 +84,9 @@ def tail_and_detect(eve_path):
             if detector.ml_error and not detector.ml_enabled and not getattr(detector, "_ml_warned", False):
                 detector._ml_warned = True
                 print(f"[!] ML layer switched off: {detector.ml_error}")
+            if detector.rf_error and not detector.rf_enabled and not getattr(detector, "_rf_warned", False):
+                detector._rf_warned = True
+                print(f"[!] RF layer switched off: {detector.rf_error}")
 
 
 def watch_network(settings_path):
@@ -112,9 +115,10 @@ def main():
     D = S.DEFAULTS
     p = argparse.ArgumentParser(description="Campus IDS real-time dashboard")
     p.add_argument("--eve", default=DEFAULT_EVE, help=f"Path to Suricata eve.json (default: {DEFAULT_EVE})")
-    p.add_argument("--design2", action="store_true", help="Use Design 2 (Random Forest ML layer) instead of Design 1 (Isolation Forest)")
-    p.add_argument("--model", default=None, help="Override the selected design's model file")
-    p.add_argument("--scaler", default=None, help="Override Design 1's scaler file")
+    p.add_argument("--design2", action="store_true", help="Design 2: add the Random Forest (RF) layer on top of the Design 1 layers")
+    p.add_argument("--model", default=None, help="Override the Isolation Forest model file")
+    p.add_argument("--scaler", default=None, help="Override the Isolation Forest scaler file")
+    p.add_argument("--rf-model", default=None, help="Override the Random Forest model file (used with --design2)")
     p.add_argument("--settings-file", default=str(ROOT / "data" / "settings.json"),
                    help="Where the Settings panel saves its values (default: data/settings.json)")
     p.add_argument("--own-ip", action="append", default=None, metavar="IP",
@@ -139,16 +143,12 @@ def main():
     if errors:
         p.error("; ".join(errors))
 
-    # Select matching model paths unless explicitly overridden by the user.
-    if args.design2:
-        model_path = args.model or str(ROOT / "design2" / "model" / "rf_model.joblib")
-        scaler_path = args.scaler  # Random Forest does not use a scaler.
-    else:
-        model_path = args.model or str(ROOT / "design1" / "model" / "ids_model.joblib")
-        scaler_path = args.scaler or str(ROOT / "design1" / "model" / "ids_scaler.joblib")
+    # Isolation Forest (ML layer) is always loaded; the Random Forest (RF layer) only with --design2.
+    model_path = args.model or str(ROOT / "design1" / "model" / "ids_model.joblib")
+    scaler_path = args.scaler or str(ROOT / "design1" / "model" / "ids_scaler.joblib")
+    rf_path = (args.rf_model or str(ROOT / "design2" / "model" / "rf_model.joblib")) if args.design2 else None
 
-    detector = Detector(model_path=model_path, scaler_path=scaler_path,
-                        design2=args.design2, **settings)
+    detector = Detector(model_path=model_path, scaler_path=scaler_path, rf_path=rf_path, **settings)
     settings_api.register(app, lambda: detector, args.settings_file)
 
     ignored = detector.own.to_list() + detector.trusted.to_list()
@@ -159,15 +159,16 @@ def main():
     else:
         print("[*] Not ignoring any source. Alerts from this PC will be shown (see the Settings panel).")
 
-    print("[*] Layers: Rule = on, Stats = on, ML = " +
-          ("on" if detector.ml_enabled else f"OFF ({detector.ml_error})"))
+    print("[*] Layers: Rule = on, Stats = on, ML (Isolation Forest) = " +
+          ("on" if detector.ml_enabled else f"OFF ({detector.ml_error})") +
+          (", RF (Random Forest) = " + ("on" if detector.rf_enabled else f"OFF ({detector.rf_error})")
+           if args.design2 else ""))
     if not detector.ml_enabled:
-        if args.design2:
-            print("    Check design2/model/rf_model.joblib and the installed scikit-learn version.")
-        else:
-            print("    To fix: pip install -r requirements.txt, or retrain:")
-            print("    python design1/model/train_model.py --input data/suricata_flow_features.csv "
-                  "--model_out design1/model/ids_model.joblib --scaler_out design1/model/ids_scaler.joblib")
+        print("    To fix: pip install -r requirements.txt, or retrain:")
+        print("    python design1/model/train_model.py --input data/suricata_flow_features.csv "
+              "--model_out design1/model/ids_model.joblib --scaler_out design1/model/ids_scaler.joblib")
+    if args.design2 and not detector.rf_enabled:
+        print("    Check design2/model/rf_model.joblib and the installed scikit-learn version.")
 
     socketio.start_background_task(tail_and_detect, args.eve)
     socketio.start_background_task(watch_network, args.settings_file)
