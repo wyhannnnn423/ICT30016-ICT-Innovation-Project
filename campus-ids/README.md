@@ -86,4 +86,7 @@ docs/  tests/  data/  assets/
 
 ## Team
 
-Jane Yan Zhen YU (Team Leader), Yan Han WONG, Neville Zi Yang, Bruce Gee Yick WONG
+- Jane Yan Zhen YU (Team Leader)
+- Yan Han WONG
+- Neville Zi Yang
+- Bruce Gee Yick WONG
