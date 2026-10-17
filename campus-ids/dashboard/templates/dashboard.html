@@ -7,7 +7,7 @@
     <title>Campus IDS - Real-Time Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-:root{--bg:#0e1726;--panel:#152238;--line:#243653;--text:#e8eef7;--muted:#8fa3bf;--rule:#ff6b57;--stats:#3cc8e8;--ml:#f2b94b;--rf:#a78bfa;--accent:#4a7de0}
+:root{--bg:#0e1726;--panel:#152238;--line:#243653;--text:#e8eef7;--muted:#8fa3bf;--rule:#ff6b57;--stats:#3cc8e8;--ml:#f2b94b;--rf:#b48cf2;--accent:#4a7de0}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;font-variant-numeric:tabular-nums}
 .container{max-width:1180px;margin:0 auto;padding:28px 24px 48px}
@@ -50,7 +50,7 @@ table{width:100%;border-collapse:collapse}
 th,td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--line);font-size:.9rem}
 th{color:var(--muted);font-weight:600;font-size:.82rem;background:#101c30}tr:last-child td{border-bottom:none}
 .row-rule,.row-stats,.row-ml,.row-rf{animation:fresh 1.6s ease-out}
-.row-rule{background:rgba(255,107,87,.07)}.row-stats{background:rgba(60,200,232,.07)}.row-ml{background:rgba(242,185,75,.07)}.row-rf{background:rgba(167,139,250,.08)}
+.row-rule{background:rgba(255,107,87,.07)}.row-stats{background:rgba(60,200,232,.07)}.row-ml{background:rgba(242,185,75,.07)}.row-rf{background:rgba(180,140,242,.08)}
 .row-rule td:first-child{box-shadow:inset 3px 0 0 var(--rule)}.row-stats td:first-child{box-shadow:inset 3px 0 0 var(--stats)}.row-ml td:first-child{box-shadow:inset 3px 0 0 var(--ml)}.row-rf td:first-child{box-shadow:inset 3px 0 0 var(--rf)}
 td:nth-child(2){font-weight:600}.row-rule td:nth-child(2){color:var(--rule)}.row-stats td:nth-child(2){color:var(--stats)}.row-ml td:nth-child(2){color:var(--ml)}.row-rf td:nth-child(2){color:var(--rf)}
 @keyframes fresh{from{background-color:rgba(255,255,255,.2)}}
@@ -67,6 +67,7 @@ td:nth-child(2){font-weight:600}.row-rule td:nth-child(2){color:var(--rule)}.row
 .link-btn{background:none;color:var(--stats);padding:0;text-decoration:underline;font-size:inherit}
 details.demo{margin-top:14px}details.demo summary{cursor:pointer;font-weight:600;font-size:.9rem}
 .cmd-row{display:flex;gap:8px;align-items:center;margin-top:6px}
+.cmd-label{flex:0 0 150px;color:var(--muted);font-size:.82rem}
 .cmd-row code{flex:1;background:#0b1322;border:1px solid var(--line);padding:6px 10px;border-radius:6px;font:.85rem Consolas,monospace;overflow-x:auto;white-space:nowrap}
 td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300px}
 @media (max-width:760px){.duo{grid-template-columns:1fr}.donut-wrap{flex-direction:column;align-items:flex-start}.toolbar{justify-content:flex-start}}
@@ -113,8 +114,8 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
                     <option value="all">All</option>
                     <option value="Rule">Rule alerts only</option>
                     <option value="ML">ML anomalies only</option>
-                    <option value="Stats">Scans and floods only</option>
                     <option value="RF">Random Forest only</option>
+                    <option value="Stats">Scans and floods only</option>
                 </select>
             </label>
             <button class="gray" onclick="toggleSettings()">Settings</button>
@@ -161,7 +162,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
             </div>
             <details class="demo">
                 <summary>Attack commands for the Kali VM (target = this PC)</summary>
-                <div class="hint">The address is filled in for you and follows the network. Run them from a second device, never from this PC.</div>
+                <div class="hint">The address is filled in for you and follows the network. Run them from a second device, never from this PC. "Big TCP flows" needs <code>scripts/simulate_attack_v3.py</code> copied to Kali and <code>python scripts/tcp_sink.py 9000</code> running on this PC.</div>
                 <div id="demo-commands"></div>
             </details>
             <div class="settings-actions">
@@ -230,7 +231,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
             document.getElementById('count-ml').textContent = counts.ML;
             document.getElementById('count-stats').textContent = counts.Stats;
             document.getElementById('count-rf').textContent = counts.RF;
-            document.getElementById('lg-rf').style.display = '';   // the RF button only appears once the layer has raised an alert
+            if (counts.RF > 0) document.getElementById('lg-rf').style.display = '';
             recordAlert(src, data.src_ip);
 
             const row = document.createElement('tr');
@@ -245,7 +246,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
             addCell(row, data.proto);
             addCell(row, data.detail || '');
             addCell(row, data.severity || '-');
-            addCell(row, data.score === null || data.score === undefined ? '-' : data.score, (src === 'ML' || src === 'RF') ? 'score-high' : '');
+            addCell(row, data.score === null || data.score === undefined ? '-' : data.score, src === 'ML' ? 'score-high' : '');
 
             tableBody.insertBefore(row, tableBody.firstChild);
             applyFilter();
@@ -364,7 +365,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
         }
 
 // ---------------- charts (plain SVG, no internet needed) ----------------
-        const COLORS = { Rule: '#ff6b57', Stats: '#3cc8e8', ML: '#f2b94b', RF: '#a78bfa' };
+        const COLORS = { Rule: '#ff6b57', Stats: '#3cc8e8', ML: '#f2b94b', RF: '#b48cf2' };
         const LAYERS = ['Rule', 'Stats', 'ML', 'RF'];
         const alertsLog = [];          // what arrived since this page was opened
 
@@ -490,10 +491,24 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
             const box = $('demo-commands');
             box.textContent = '';
             if (!ip) { box.textContent = 'No IP address known yet.'; return; }
-            ['ping -c 4 ' + ip, 'sudo nmap -sS -p 1-1000 ' + ip, 'sudo hping3 -S -p 80 -i u10000 -c 500 ' + ip]
-                .forEach(function (cmd) {
+            [['Ping', 'ping -c 4 ' + ip],
+             ['Port scan (SYN)', 'sudo nmap -sS -p 1-1000 ' + ip],
+             ['Port scan (connect)', 'nmap -sT -p 1-1000 ' + ip],
+             ['Port scan (FIN)', 'sudo nmap -sF -p 1-1000 ' + ip],
+             ['Slow port scan', 'sudo nmap -sS -T2 -p 1-1000 ' + ip],
+             ['SYN flood (100 pps)', 'sudo hping3 -S -p 80 -i u10000 -c 500 ' + ip],
+             ['SYN flood (10 pps)', 'sudo hping3 -S -p 80 -i u100000 -c 300 ' + ip],
+             ['SYN flood (full speed)', 'sudo hping3 -S -p 80 --flood ' + ip],
+             ['UDP flood', 'sudo hping3 --udp -p 53 -i u1000 -c 3000 ' + ip],
+             ['Big TCP flows', 'python3 simulate_attack_v3.py ' + ip + ' 9000']]
+                .forEach(function (item) {
+                    const cmd = item[1];
                     const row = document.createElement('div');
                     row.className = 'cmd-row';
+                    const label = document.createElement('span');
+                    label.className = 'cmd-label';
+                    label.textContent = item[0];
+                    row.appendChild(label);
                     const code = document.createElement('code');
                     code.textContent = cmd;
                     const b = document.createElement('button');
