@@ -183,6 +183,21 @@ class DetectorTests(unittest.TestCase):
             out += d.process(flow_event("10.0.0.10", port))
         self.assertEqual(len(out), 1)
 
+    def test_ml_layer_also_ignores_own_pc(self):
+        class Scaler:
+            def transform(self, x): return x
+        class Model:
+            def predict(self, x): return [-1]
+            def decision_function(self, x): return [-0.2]
+        d = self.make(own_ips=["192.168.50.190"], trusted_ips=["10.0.0.9"])
+        d.model, d.scaler = Model(), Scaler()
+        big = lambda src: {"event_type": "flow", "timestamp": "2026-10-08T10:00:00+0800", "src_ip": src,
+                           "dest_ip": "142.250.0.1", "dest_port": 443, "proto": "UDP",
+                           "flow": {"pkts_toserver": 500, "pkts_toclient": 500, "bytes_toserver": 9e5, "bytes_toclient": 9e5}}
+        self.assertEqual(d.process(big("192.168.50.190")), [])           # own PC browsing
+        self.assertEqual(d.process(big("10.0.0.9")), [])                 # trusted source
+        self.assertEqual(len(d.process(big("192.168.50.204"))), 1)       # anyone else is still reported
+
     def test_settings_apply_while_running(self):
         d = self.make()
         out = []

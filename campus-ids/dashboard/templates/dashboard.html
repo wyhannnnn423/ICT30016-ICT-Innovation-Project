@@ -91,7 +91,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
                     <button class="lg lg-rule" onclick="pick('Rule')"><i></i>Rule alerts <b id="count-rule">0</b></button>
                     <button class="lg lg-stats" onclick="pick('Stats')"><i></i>Scans and floods <b id="count-stats">0</b></button>
                     <button class="lg lg-ml" onclick="pick('ML')"><i></i>ML anomalies <b id="count-ml">0</b></button>
-                    <button class="lg lg-rf" id="lg-rf" style="display:none" onclick="pick('RF')"><i></i>Random Forest <b id="count-rf">0</b></button>
+                    <button class="lg lg-rf" id="lg-rf" style="display:{{ '' if design2 else 'none' }}" onclick="pick('RF')"><i></i>Random Forest <b id="count-rf">0</b></button>
                 </div>
             </div>
             <div id="chart-timeline" class="chart"></div>
@@ -196,6 +196,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
     </div>
 
     <script>
+        const DESIGN2 = {{ 'true' if design2 else 'false' }};
         const socket = io();
         const counts = { Rule: 0, ML: 0, Stats: 0, RF: 0 };
         const rowClass = { Rule: 'row-rule', ML: 'row-ml', Stats: 'row-stats', RF: 'row-rf' };
@@ -231,7 +232,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
             document.getElementById('count-ml').textContent = counts.ML;
             document.getElementById('count-stats').textContent = counts.Stats;
             document.getElementById('count-rf').textContent = counts.RF;
-            if (counts.RF > 0) document.getElementById('lg-rf').style.display = '';
+            if (DESIGN2 || counts.RF > 0) document.getElementById('lg-rf').style.display = '';
             recordAlert(src, data.src_ip);
 
             const row = document.createElement('tr');
@@ -279,7 +280,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
 
         function updateSummary(s) {
             const ignored = (s.own_ips || []).concat(s.trusted_ips || []);
-            const who = ignored.length ? 'Hiding Rule/Stats alerts from: ' + ignored.join(', ')
+            const who = ignored.length ? 'Hiding alerts from: ' + ignored.join(', ')
                                        : 'Not hiding any source (alerts from this PC are shown).';
             $('ignore-summary').textContent = who + '  |  Scan: ' + s.scan_ports + ' ports, flood: ' +
                 s.flood_flows + ' connections, within ' + s.window + ' s';
@@ -433,7 +434,7 @@ td:first-child{white-space:nowrap}th:nth-child(6),td:nth-child(6){min-width:300p
             });
             s += '<text class="big" x="60" y="62" text-anchor="middle">' + tot + '</text><text class="axis" x="60" y="78" text-anchor="middle">alerts</text></svg>';
             const names = { Rule: 'Rule alerts', Stats: 'Scans and floods', ML: 'ML anomalies', RF: 'Random Forest' };
-            s += '<div>' + LAYERS.filter(function (k) { return k !== 'RF' || counts.RF > 0; }).map(function (k) {
+            s += '<div>' + LAYERS.filter(function (k) { return k !== 'RF' || DESIGN2 || counts.RF > 0; }).map(function (k) {
                 const pct = tot ? Math.round(100 * counts[k] / tot) : 0;
                 return '<div class="hint" style="margin:3px 0;color:var(--text)"><span style="color:' + COLORS[k] + '">&#9679;</span> ' + names[k] + ' ' + pct + '%</div>';
             }).join('') + '</div>';

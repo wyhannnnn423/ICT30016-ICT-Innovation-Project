@@ -99,7 +99,7 @@ class Detector:
 
     # ---------- settings that can be changed while running ----------
     def is_ignored(self, ip):
-        """True if Rule and Stats alerts from this source IP must be hidden."""
+        """True if alerts (all layers) from this source IP must be hidden."""
         return self.own.matches(ip) or self.trusted.matches(ip)
 
     def get_settings(self):
@@ -208,7 +208,7 @@ class Detector:
 
     def _ml_alert(self, event, now=None):
         """Isolation Forest on one completed flow."""
-        if not self.ml_enabled:
+        if not self.ml_enabled or self.is_ignored(event.get("src_ip")):
             return []
         flow = event.get("flow", {})
         if flow.get("pkts_toserver", 0) + flow.get("pkts_toclient", 0) < self.min_pkts:
@@ -231,7 +231,7 @@ class Detector:
 
     def _rf_alert(self, event, now=None):
         """Random Forest on the recent flows of one source IP (rolling window)."""
-        if not self.rf_enabled:
+        if not self.rf_enabled or self.is_ignored(event.get("src_ip")):
             return []
         now = time.time() if now is None else now
         flow = event.get("flow", {})

@@ -107,7 +107,7 @@ def watch_network(settings_path):
 
 @app.route("/")
 def index():
-    return render_template("dashboard.html")
+    return render_template("dashboard.html", design2=bool(detector and detector.design2))
 
 
 def main():
@@ -155,7 +155,7 @@ def main():
     if auto_ip:
         print(f"[*] This PC's LAN IP was detected automatically: {auto_ip} (it follows network changes)")
     if ignored:
-        print("[*] Ignoring Rule/Stats alerts from: " + ", ".join(ignored))
+        print("[*] Ignoring alerts from: " + ", ".join(ignored))
     else:
         print("[*] Not ignoring any source. Alerts from this PC will be shown (see the Settings panel).")
 
