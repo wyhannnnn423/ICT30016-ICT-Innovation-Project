@@ -6,7 +6,17 @@ A lightweight, lab-tested intrusion detection system for a campus-style network.
 
 ![Dashboard](assets/dashboard.png)
 
-## Detection layers
+
+## Team
+
+| Member | Role & Contributions |
+|---|---|
+| **Jane Yan Zhen YU** (Team Leader) | System architecture & threat modelling, Layer 1 Suricata signature rules, baseline profiling, QA test plan & project management |
+| **Yan Han WONG** | Repository setup, Suricata & Npcap capture pipeline (`start_suricata.ps1`), live `eve.json` reader, Layer 2 Stats detector & 10-second window feature extraction (`aggregate.py`) |
+| **Bruce Gee Yick WONG** | Layer 3 Isolation Forest & Layer 4 Random Forest model training/tuning, CIC-IDS2017 evaluation pipeline & attack testing |
+| **Neville Zi Yang** | Flask-SocketIO backend, real-time alert routing, four-layer web dashboard UI, settings panel & CSV export |
+
+> **Note on Commit History:** As our team was learning Git/GitHub workflows during this project and our capture/testing setup ran on a single host machine, most integration, debugging, and commits were carried out collaboratively in face-to-face sessions and pushed from one local environment. Therefore, GitHub commit authorship does not reflect individual workload or code ownership—please refer to the contribution table above for each member's actual responsibilities.## Detection layers
 
 | Layer | Colour | What it catches | Where |
 |---|---|---|---|
@@ -131,10 +141,3 @@ docs/  tests/  data/  assets/
 - Isolation Forest looks at single flows, so it misses scans and floods (0% on CIC-IDS2017 DDoS/PortScan); Stats and RF cover those.
 - RF was trained on our own Kali attacks; it can miss full-speed floods and UDP attacks, which Stats catches. Results are a first indication, not general accuracy.
 - Alerts are not stored after the dashboard stops.
-
-## Team
-
-- Jane Yan Zhen YU (Team Leader)
-- Yan Han WONG
-- Neville Zi Yang
-- Bruce Gee Yick WONG
