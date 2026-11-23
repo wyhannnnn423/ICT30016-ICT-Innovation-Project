@@ -16,6 +16,7 @@ A lightweight, lab-tested intrusion detection system for a campus-style network.
 > **Note on Commit History:** As our team was learning Git/GitHub workflows during this project and our capture/testing setup ran on a single host machine, most integration, debugging, and commits were carried out collaboratively in face-to-face sessions and pushed from one local environment. Therefore, GitHub commit authorship does not reflect individual workload or code ownership—please refer to the contribution table above for each member's actual responsibilities.
 
 ![Dashboard](assets/dashboard.png)
+
 ## Detection layers
 | Layer | Colour | What it catches | Where |
 |---|---|---|---|
@@ -48,7 +49,7 @@ The tool runs on **Windows** (the start script is PowerShell and Suricata needs 
 | Windows 10/11 | Runs Suricata, the dashboard and the browser |
 | [Suricata](https://suricata.io/download/) for Windows (installs to `C:\Program Files\Suricata`) | Captures traffic and writes `eve.json` |
 | [Npcap](https://npcap.com/) | Packet capture driver used by Suricata |
-| Python 3 (add the version you tested with) and `pip` | Dashboard and ML models |
+| Python 3 and `pip` | Dashboard and ML models |
 | Administrator PowerShell | Needed to start Suricata |
 | Kali Linux VM, network adapter set to **Bridged** (optional) | Only to run the attack tests; see [docs/lab-setup.md](docs/lab-setup.md) |
 
@@ -127,7 +128,10 @@ design1/      Isolation Forest model + training script
 design2/      Random Forest model
 evaluation/   CIC-IDS2017 evaluation and comparison results
 scripts/      Suricata start script, attack simulators
-docs/  tests/  data/  assets/
+docs/  
+tests/  
+data/  
+assets/
 ```
 
 ## Documentation
