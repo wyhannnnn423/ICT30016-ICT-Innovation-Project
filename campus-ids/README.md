@@ -30,23 +30,65 @@ Design 2 is Design 1 plus one extra layer, so nothing Design 1 detects is lost.
 | <img src="assets/design1result.png" width="100%"> | <img src="assets/design2result.png" width="100%"> |
 | Rule, Stats and ML alerts | Same, plus purple Random Forest alerts |
 
+## Requirements
+
+The tool runs on **Windows** (the start script is PowerShell and Suricata needs Administrator rights).
+
+| Needed | Why |
+|---|---|
+| Windows 10/11 | Runs Suricata, the dashboard and the browser |
+| [Suricata](https://suricata.io/download/) for Windows (installs to `C:\Program Files\Suricata`) | Captures traffic and writes `eve.json` |
+| [Npcap](https://npcap.com/) | Packet capture driver used by Suricata |
+| Python 3 (add the version you tested with) and `pip` | Dashboard and ML models |
+| Administrator PowerShell | Needed to start Suricata |
+| Kali Linux VM, network adapter set to **Bridged** (optional) | Only to run the attack tests; see [docs/lab-setup.md](docs/lab-setup.md) |
+
+Without Suricata or Kali you can still check the code with `python tests/test_settings.py` (the API tests need Flask only).
+
 ## Setup
 
+**1. Clone and install**
+
 ```powershell
+git clone https://github.com/wyhannnnn423/ICT30016-ICT-Innovation-Project.git
+cd ICT30016-ICT-Innovation-Project\campus-ids
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-1. Copy `suricata/rules/campus-ids.rules` into Suricata's rules folder, add it to `rule-files:` in `suricata.yaml`.
-2. Start Suricata (Administrator PowerShell): `.\scripts\start_suricata.ps1`
-3. Start the dashboard: `python dashboard/app.py` (or `--design2`), open http://127.0.0.1:5000
+**2. Add our rules to Suricata**
+
+1. Copy `suricata/rules/campus-ids.rules` into `C:\Program Files\Suricata\rules\`.
+2. In `suricata.yaml`, add `- campus-ids.rules` under `rule-files:` and make sure `alert` is listed under the `eve-log` types.
+3. Test the config in an Administrator terminal: `suricata.exe -T -c suricata.yaml`. It should report the rules loaded with 0 failed.
+
+Save the rules file as plain text; a wrong encoding once made Suricata load 0 rules.
+
+**3. Start Suricata** (Administrator PowerShell)
+
+```powershell
+.\scripts\start_suricata.ps1
+```
+
+The script finds the network adapter that carries the default route and starts Suricata on it. If the PC later joins another network, stop Suricata with Ctrl+C and run the script again. Details: [docs/dashboard-settings.md](docs/dashboard-settings.md).
+
+**4. Start the dashboard**
+
+```powershell
+python dashboard/app.py            # Design 1
+python dashboard/app.py --design2  # Design 2 (adds the Random Forest layer)
+```
+
+Open http://127.0.0.1:5000. Nothing needs to be configured: the IP of this PC is detected automatically and its own traffic is not reported. A banner under the summary line turns green when traffic of this PC arrives.
 
 Useful options: `--eve <path>`, `--own-ip <IP>`, `--host 0.0.0.0`, `--port 5000`, `--model`, `--scaler`, `--rf-model`.
 
+**Trained models.** The dashboard loads the models from `design1/model/` and `design2/model/`. If those `.joblib` files are missing after cloning, create them first with the commands in [Train and evaluate](#train-and-evaluate).
+
 ## Test with attacks
 
-Open **Settings → Attack commands** in the dashboard. The target IP is filled in; copy each command and run it on the Kali VM (never against a machine you do not own). Setup: [docs/lab-setup.md](docs/lab-setup.md).
+Open **Settings → Attack commands** in the dashboard. The target IP is filled in; copy each command and run it on the Kali VM (never against a machine you do not own). Lab setup and expected results: [docs/lab-setup.md](docs/lab-setup.md).
 
 ![Settings](assets/settings.png)
 
@@ -64,7 +106,7 @@ Train Design 1 on normal traffic only. Random Forest training and the Design 1 v
 
 ## Settings
 
-Own PC IP, trusted IPs, scan threshold (15 ports), flood threshold (150 connections), time window (10 s) and cooldown (30 s). Saved to `data/settings.json`; changeable only from the PC running the dashboard.
+Own PC IP, trusted IPs, scan threshold (15 ports), flood threshold (150 connections), time window (10 s) and cooldown (30 s). Saved to `data/settings.json`; changeable only from the PC running the dashboard. Full description: [docs/dashboard-settings.md](docs/dashboard-settings.md).
 
 ## Structure
 
@@ -77,6 +119,12 @@ evaluation/   CIC-IDS2017 evaluation and comparison results
 scripts/      Suricata start script, attack simulators
 docs/  tests/  data/  assets/
 ```
+
+## Documentation
+
+- [docs/lab-setup.md](docs/lab-setup.md): machines, one-time setup, attack commands, first test run
+- [docs/dashboard-settings.md](docs/dashboard-settings.md): Settings panel, capture banner, automatic network handling
+- [design1/README.md](design1/README.md) and [design2/README.md](design2/README.md): models and training
 
 ## Known limits
 
