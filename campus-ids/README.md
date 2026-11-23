@@ -8,7 +8,7 @@ A lightweight, lab-tested intrusion detection system for a campus-style network.
 
 | Member | Area | Contributions |
 |---|---|---|
-| **Jane Yan Zhen YU** (Team Leader) | Architecture, rules, QA, management | Dual-track architecture and threat model; Layer 1 rules (ICMP, SYN flood); baseline profiling and false-alarm criteria; D5 QA test plan and regression checks; agile board and sprint backlog; meetings and minutes; compiled and submitted the Specification report; Week 8 decision-gate metrics; Stand up 2 |
+| **Jane Yan Zhen YU** (Team Leader) | Architecture, rules, QA, management | Dual-track architecture and threat model; Layer 1 rules (ICMP, SYN flood); baseline profiling and false-alarm criteria; D5 QA test plan and regression checks; compiled and submitted the Specification report; Week 8 decision-gate metrics; Stand up 2 |
 | **Yan Han WONG** | Set-up, capture, Stats, windows | GitHub repo, branching, `design1/` and `design2/` layout; Suricata and Npcap set-up, `start_suricata.ps1`; live `eve.json` reader with offset tracking; joint feature mapping with Bruce; `aggregate.py` (10 s per-IP windows); `stats_detector.py` and IP whitelist; Kali attacks with Bruce; demo video |
 | **Bruce Gee Yick WONG** | ML and evaluation | Layer 3 Isolation Forest and contamination tuning; Layer 4 Random Forest training, class weights, depth tuning; CIC-IDS2017 evaluation pipeline and confusion matrices; joint feature mapping and Kali attacks |
 | **Neville Zi Yang** | Dashboard | Wireframes, responsive CSS, theme; Flask-SocketIO backend and alert routing; four-layer alert grid, filters, settings panel; CSV export and forensic logging |
