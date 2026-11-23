@@ -4,20 +4,19 @@ A lightweight, lab-tested intrusion detection system for a campus-style network.
 
 > Tested only in a controlled lab (Kali VM attacker, Windows target) and on CIC-IDS2017 as a benchmark. Not validated on a live campus network.
 
-![Dashboard](assets/dashboard.png)
-
-
 ## Team
 
-| Member | Role & Contributions |
-|---|---|
-| **Jane Yan Zhen YU** (Team Leader) | System architecture & threat modelling, Layer 1 Suricata signature rules, baseline profiling, QA test plan & project management |
-| **Yan Han WONG** | Repository setup, Suricata & Npcap capture pipeline (`start_suricata.ps1`), live `eve.json` reader, Layer 2 Stats detector & 10-second window feature extraction (`aggregate.py`) |
-| **Bruce Gee Yick WONG** | Layer 3 Isolation Forest & Layer 4 Random Forest model training/tuning, CIC-IDS2017 evaluation pipeline & attack testing |
-| **Neville Zi Yang** | Flask-SocketIO backend, real-time alert routing, four-layer web dashboard UI, settings panel & CSV export |
+| Member | Area | Contributions |
+|---|---|---|
+| **Jane Yan Zhen YU** (Team Leader) | Architecture, rules, QA, management | Dual-track architecture and threat model; Layer 1 rules (ICMP, SYN flood); baseline profiling and false-alarm criteria; D5 QA test plan and regression checks; agile board and sprint backlog; meetings and minutes; compiled and submitted the Specification report; Week 8 decision-gate metrics; Stand up 2 |
+| **Yan Han WONG** | Set-up, capture, Stats, windows | GitHub repo, branching, `design1/` and `design2/` layout; Suricata and Npcap set-up, `start_suricata.ps1`; live `eve.json` reader with offset tracking; joint feature mapping with Bruce; `aggregate.py` (10 s per-IP windows); `stats_detector.py` and IP whitelist; Kali attacks with Bruce; demo video |
+| **Bruce Gee Yick WONG** | ML and evaluation | Layer 3 Isolation Forest and contamination tuning; Layer 4 Random Forest training, class weights, depth tuning; CIC-IDS2017 evaluation pipeline and confusion matrices; joint feature mapping and Kali attacks |
+| **Neville Zi Yang** | Dashboard | Wireframes, responsive CSS, theme; Flask-SocketIO backend and alert routing; four-layer alert grid, filters, settings panel; CSV export and forensic logging |
 
-> **Note on Commit History:** As our team was learning Git/GitHub workflows during this project and our capture/testing setup ran on a single host machine, most integration, debugging, and commits were carried out collaboratively in face-to-face sessions and pushed from one local environment. Therefore, GitHub commit authorship does not reflect individual workload or code ownership—please refer to the contribution table above for each member's actual responsibilities.## Detection layers
+> **Note on Commit History:** As our team was learning Git/GitHub workflows during this project and our capture/testing setup ran on a single host machine, most integration, debugging, and commits were carried out collaboratively in face-to-face sessions and pushed from one local environment. Therefore, GitHub commit authorship does not reflect individual workload or code ownership—please refer to the contribution table above for each member's actual responsibilities.
 
+![Dashboard](assets/dashboard.png)
+## Detection layers
 | Layer | Colour | What it catches | Where |
 |---|---|---|---|
 | Rule | red | Known signatures (ping, SYN burst) | `suricata/rules/campus-ids.rules` |
