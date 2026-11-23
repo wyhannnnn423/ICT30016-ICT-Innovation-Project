@@ -85,6 +85,7 @@ The script finds the network adapter that carries the default route and starts S
 **4. Start the dashboard**
 
 ```powershell
+cd ICT30016-ICT-Innovation-Project\campus-ids
 python dashboard/app.py            # Design 1
 python dashboard/app.py --design2  # Design 2 (adds the Random Forest layer)
 ```
